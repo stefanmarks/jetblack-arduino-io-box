@@ -15,8 +15,8 @@
  * Return value: "+" or value if command successful, "!" if an error occured
  */
  
+#include <Wire.h>
 #include "LED.h"
-#include "Wire.h"
 #include "Adafruit_MCP23017.h"
 #include "Adafruit_RGBLCDShield.h"
  
@@ -265,7 +265,8 @@ void processSetLcdTextCommand()
     char quotation = readChar();
     while(quotation != '"')
     {
-      if(charsAvailable() == 0)
+      quotation = readChar();
+      if(charsAvailable() <= 0)
       {
         break;
       }
@@ -273,6 +274,8 @@ void processSetLcdTextCommand()
     
     if(quotation == '"')
     {
+      Serial.println("got here");
+      Serial.println(charsAvailable());
       processText();
     }
     
@@ -293,6 +296,8 @@ void processText()
     if(index < 24)
     {
       incomingChar = readChar();
+      Serial.print("char found");
+      Serial.println(incomingChar);
       if(incomingChar == '"')
       {
         break;
@@ -305,23 +310,27 @@ void processText()
       incomingString[index] = '\0'; 
     }
   }
-
+  Serial.println(charsAvailable());
+  Serial.print("Text is: "); 
+  Serial.println(incomingString);
+  Serial.println(index);
   if (index  > 0) 
-  {
-    lcd.print(incomingString);
-    
-    for(int i = 0; i < 24; i++)
-    {
+  {  
+    for(int i = 0; i < index; i++)
+    {      
       if(incomingString[i] == NEWLINE)
       {
         lcd.setCursor(xLocation, yLocation++);
       }
-      if(incomingString[i] != '\0')
+      if(incomingString[i] == '\0')
       {
         break;
         //lcd.setCursor(i,0);
         //lcd.print(incomingString[i]); 
       }
+      //lcd.setCursor(xLocation+i,yLocation);
+      lcd.print(incomingString);
+      //lcd.setBacklight(BLUE);
       incomingString[i] = '\0';
     }    
   } 
