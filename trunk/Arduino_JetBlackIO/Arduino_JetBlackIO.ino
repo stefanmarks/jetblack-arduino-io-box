@@ -41,6 +41,7 @@ int selection = 0;
 int NEWLINE = 10;
 //default row and column locations set to 0
 int row = 0, column = 0;
+boolean connectedLCD = false;
 
 //Predefined #defines for LCD backlight color
 #define BLACK 0x0
@@ -73,6 +74,7 @@ void setup()
   initializeLCD();
   // initialize serial communication at maximum bitrate
   Serial.begin(115200);
+  connectedLCD = checkConnection();
 }
 
 /**
@@ -111,7 +113,16 @@ void serialEvent()
         case 'E': processEchoCommand(); break;
         case 'l': processGetLedBrightnessCommand(); break;
         case 'L': processSetLedBrightnessCommand(); break;
-        case 'T': processSetLcdTextCommand(); break;
+        case 'T': 
+                  if(connectedLCD)
+                  {
+                    processSetLcdTextCommand();
+                  }
+                  else
+                  {
+                    Serial.println("LCD is not connected");
+                  }
+                  break;
         
         // ignore extraneous bytes
         case CHAR_LF: break;
@@ -321,6 +332,32 @@ void processText()
     }    
   } 
 }
+
+/**
+  * checks the LCD's default i2c to see if it is connected
+  */
+boolean checkConnection() {
+  Serial.println ();
+  Serial.println ("Checking for LCD");
+  byte count = 0;
+  boolean found = false;
+  
+  Wire.begin();
+  Wire.beginTransmission(32);
+  if(Wire.endTransmission() == 0)
+  {
+    Serial.print("LCD Device connected at ");
+    Serial.println(32, HEX);
+    found = true;
+  }
+  
+  if(!found)
+  {
+     Serial.println("LCD was not found"); 
+  }
+  return found;
+}
+
  
 
 /**
