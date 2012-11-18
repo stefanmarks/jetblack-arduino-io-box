@@ -6,11 +6,11 @@
  *
  *
  * Command set:
- * E             : Echo version number
- * La,b[,c[,d]]  : Set LED a brightness to b (00-99) (and blink interval to c, and blink ratio to d)
- * la            : Get brightness of LED a
- * T,x,y "string": Set text on LCD display, set to location row and column of where to start writing
- *                
+ * E               : Echo version number
+ * La,b[,c[,d]]    : Set LED a brightness to b (00-99) (and blink interval to c, and blink ratio to d)
+ * la              : Get brightness of LED a
+ * T,x,y,z "string": Set text on LCD display, set to location row(x) and column(y) of where to start writing
+ *                   turn screen on/off by sending 0 (on) or 1(off) as z. i.e. T101"hi" prints to row 1, column 0 with screen on                
  * 
  * Return value: "+" or value if command successful, "!" if an error occured
  */
@@ -254,29 +254,40 @@ void initializeLCD()
  */
 void processSetLcdTextCommand()
 {  
-  char nextChar = readChar();
-  boolean rowDone = false, columnDone = false;
-  while(nextChar != '"' || charsAvailable <= 0)
+  char nextChar = ' ';
+  column = 0, row = 0;
+  boolean rowDone = false, columnDone = false, backLightDone = false;
+  while(nextChar != '"' && charsAvailable() > 0)
   {
+    nextChar = readChar();
     //check if row hasn't already been set, if characters are left
     //and if the found character is a number
-    if (!rowDone && charsAvailable() > 0 && nextChar >='0' && nextChar <='9')
+    if (!rowDone && nextChar >='0' && nextChar <='9')
     {
       // sets the row Location on the LCD
-      row = nextChar;
+      row = nextChar - '0';
       rowDone = true;
     }
-    
-    if (!columnDone && charsAvailable() > 0 && nextChar >='0' && nextChar <='9')
+    else if (!columnDone && nextChar >='0' && nextChar <='9')
     {
       // sets the column location on the LCD
-      column = nextChar; 
+      column = nextChar - '0'; 
       columnDone = true;
     }
-    nextChar = readChar();
+    else if(!backLightDone && nextChar >= '0' && nextChar <= '1')
+    {
+      if(nextChar == '0')
+      {
+         lcd.setBacklight(BLACK);
+      }
+      else
+      {
+         lcd.setBacklight(WHITE); 
+      }
+      backLightDone = true;
+    } 
   }
   
-    
     lcd.setCursor(column, row);
     
     //Now we check to see if any quotation marks are present
@@ -316,19 +327,21 @@ void processText()
     }
   }
   if (index  > 0) 
-  {  
+  { 
+   lcd.print(incomingString); 
     for(int i = 0; i < index; i++)
     {      
       if(incomingString[i] == NEWLINE)
       {
-        lcd.setCursor(column , row++);
+        //lcd.setCursor(column , row++);
       }
       if(incomingString[i] == '\0')
       {
         break;
       }
       //lcd.setCursor(xLocation+i,yLocation);
-      lcd.print(incomingString);
+      //lcd.setCursor(column , row + i);
+      //lcd.print(incomingString[i]); 
       //lcd.setBacklight(BLUE);
       incomingString[i] = '\0';
     }    
