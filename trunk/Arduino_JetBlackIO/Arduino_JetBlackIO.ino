@@ -9,7 +9,7 @@
  * E             : Echo version number
  * La,b[,c[,d]]  : Set LED a brightness to b (00-99) (and blink interval to c, and blink ratio to d)
  * la            : Get brightness of LED a
- * T,x,y "string": Set text on LCD display, set to location x and y (row and column of where to start writing)
+ * T,x,y "string": Set text on LCD display, set to location row and column of where to start writing
  *                
  * 
  * Return value: "+" or value if command successful, "!" if an error occured
@@ -39,9 +39,8 @@ Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 char incomingString[25]; // Set some space for the string (25 characters)
 int selection = 0; 
 int NEWLINE = 10;
-//default x and y locations set to 0
-int xLocation = 0;
-int yLocation = 0;
+//default row and column locations set to 0
+int row = 0, column = 0;
 
 //Predefined #defines for LCD backlight color
 #define BLACK 0x0
@@ -105,7 +104,6 @@ void serialEvent()
     // did we receive a CR or LF?
     if ( (rxIn == CHAR_LF) || (rxIn == CHAR_CR) )     
     {
-      //Serial.println(readChar());
       // look at what command it is
       switch ( readChar() )
       {
@@ -245,37 +243,33 @@ void initializeLCD()
  */
 void processSetLcdTextCommand()
 {  
-  if ( charsAvailable() > 0 )
+  char nextChar = readChar();
+  boolean rowDone = false, columnDone = false;
+  while(nextChar != '"' || charsAvailable <= 0)
+  {
+    if (!rowDone && charsAvailable() > 0 )
     {
-      // sets the x Location on the LCD
-      xLocation = readInt();
+      // sets the row Location on the LCD
+      row = readInt();
+      rowDone = true;
     }
     
-    if ( charsAvailable() > 0 )
+    if (!columnDone && charsAvailable() > 0 )
     {
-      // sets the y location on the LCD
-      yLocation = readInt(); 
+      // sets the column location on the LCD
+      column = readInt(); 
+      columnDone = true;
     }
+    nextChar = readChar();
+  }
+  
     
-    lcd.setCursor(xLocation, yLocation);
+    lcd.setCursor(column, row);
     
     //Now we check to see if any quotation marks are present
-    //only print strings that begin with a quotation
-    
-    char quotation = readChar();
-    while(quotation != '"')
+    //only print strings that begin with a quotation    
+    if(nextChar == '"')
     {
-      quotation = readChar();
-      if(charsAvailable() <= 0)
-      {
-        break;
-      }
-    }
-    
-    if(quotation == '"')
-    {
-      Serial.println("got here");
-      Serial.println(charsAvailable());
       processText();
     }
     
@@ -296,8 +290,6 @@ void processText()
     if(index < 24)
     {
       incomingChar = readChar();
-      Serial.print("char found");
-      Serial.println(incomingChar);
       if(incomingChar == '"')
       {
         break;
@@ -310,23 +302,17 @@ void processText()
       incomingString[index] = '\0'; 
     }
   }
-  Serial.println(charsAvailable());
-  Serial.print("Text is: "); 
-  Serial.println(incomingString);
-  Serial.println(index);
   if (index  > 0) 
   {  
     for(int i = 0; i < index; i++)
     {      
       if(incomingString[i] == NEWLINE)
       {
-        lcd.setCursor(xLocation, yLocation++);
+        lcd.setCursor(column , row++);
       }
       if(incomingString[i] == '\0')
       {
         break;
-        //lcd.setCursor(i,0);
-        //lcd.print(incomingString[i]); 
       }
       //lcd.setCursor(xLocation+i,yLocation);
       lcd.print(incomingString);
