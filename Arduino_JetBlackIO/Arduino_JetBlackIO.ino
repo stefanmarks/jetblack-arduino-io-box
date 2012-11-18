@@ -258,17 +258,19 @@ void processSetLcdTextCommand()
   boolean rowDone = false, columnDone = false;
   while(nextChar != '"' || charsAvailable <= 0)
   {
-    if (!rowDone && charsAvailable() > 0 )
+    //check if row hasn't already been set, if characters are left
+    //and if the found character is a number
+    if (!rowDone && charsAvailable() > 0 && nextChar >='0' && nextChar <='9')
     {
       // sets the row Location on the LCD
-      row = readInt();
+      row = nextChar;
       rowDone = true;
     }
     
-    if (!columnDone && charsAvailable() > 0 )
+    if (!columnDone && charsAvailable() > 0 && nextChar >='0' && nextChar <='9')
     {
       // sets the column location on the LCD
-      column = readInt(); 
+      column = nextChar; 
       columnDone = true;
     }
     nextChar = readChar();
