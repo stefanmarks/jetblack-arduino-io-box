@@ -13,23 +13,27 @@ public class ArduinoIO_Module : MonoBehaviour
 	public String modulePort  = "COM3";
 	public int    moduleSpeed = 115200;
 	
-    private const String CMD_ECHO = "E";
+	public VehicleDataCollector scriptVehicleData;
+	
+	private const String CMD_ECHO = "E";
 	
 	
 	/// <summary>
-	/// Initialisation of the class. 
+	/// Initialisation of the Arduino IO-Box script. 
 	/// </summary>
 	/// 
 	public void Start() 
 	{
-		bool success = false;
-		
+		if ( !scriptVehicleData ) Debug.LogError("No vehicle data collector script defined!");
+		vehicleData = null;
+
 		serialPort = new SerialPort(modulePort, moduleSpeed, Parity.None, 8, StopBits.One);
 		serialPort.Handshake   = Handshake.None;
 		serialPort.RtsEnable   = false;
 		serialPort.DtrEnable   = false;  // Disable DTR so NOT to reset Arduino board when connecting
 		serialPort.ReadTimeout = 250;    // longer read timeout (module might have had a reset nevertheless)
 		
+		bool success = false;
 		serialPort.Open();
 		if ( serialPort.IsOpen )
 		{
@@ -52,6 +56,9 @@ public class ArduinoIO_Module : MonoBehaviour
 						serialPort.DiscardInBuffer(); // discard any crap that was sent, too
 						serialPort.DiscardOutBuffer();
 						success = true;
+						
+						setText(0, "  JetBlack HUD  ");
+						setText(1, "      Ready     ");
 					}
 				}
 				catch (TimeoutException)
@@ -85,22 +92,23 @@ public class ArduinoIO_Module : MonoBehaviour
 			
 
 	/// <summary>
-	/// The script is disabled (e.g., when the game stops).
-	/// The asynchronous receiving method is stopped
-	/// by setting the module address to null.
+	/// The script is destroyed (e.g., when the game stops).
 	/// </summary>
 	/// 
-	public void OnApplicationQuit()
+	public void OnDestroy()
 	{
-		if ( serialPort != null )
+		if ( IsConnected() )
 		{
+			// turn off LEDs and clear display
+			setLed(0, 0); setLed(1, 0);
+			clearText();
+			
 			serialPort.Close();
 			serialPort = null;
 			// Debug.Log ("Serial port " + modulePort + " closed.");
 		}
 	}
 	
-		
 	
 	/// <summary>
 	/// Loop for polling the inputs regularly and sending any state changes.
@@ -108,30 +116,80 @@ public class ArduinoIO_Module : MonoBehaviour
 	/// 
 	public void Update() 
 	{
+		if ( !IsConnected() || !scriptVehicleData ) return;
+		
+		// check vehicle state
+		scriptVehicleData.GetData(ref vehicleData);
+		VehicleSafetyControl.State state = vehicleData.safetyState;
+		// any changes?
+		if ( state != oldState )
+		{
+			switch ( state )
+			{
+				case VehicleSafetyControl.State.NOMINAL:
+				{
+					// no more blinking
+					setLed(0, 0); setLed(1, 0);
+					break;
+				}
+				case VehicleSafetyControl.State.OVERHEAT_WHEEL_L:
+				{
+					// left LED blink
+					setLed(0, 99, 500, 50);
+					break;
+				}
+				case VehicleSafetyControl.State.OVERHEAT_WHEEL_R:
+				{
+					// right LED blink
+					setLed(1, 99, 500, 50);
+					break;
+				}
+				case VehicleSafetyControl.State.ABORT:
+				{
+					// turn off LEDs
+					setLed(0, 0); setLed (1, 0);
+					// write text
+					setText(0, "!!!! ABORT !!!! ");
+					setText(1, "!!!! ABORT !!!! ");
+					break;
+				}
+			}
+			oldState = state;
+		}	
+	}
+	
+	
+	private void setLed(int led, int brightness)
+	{
 		if ( IsConnected() )
 		{
-			int i = (int) (50 + (49 * Math.Sin (Time.time * 4)));
-			serialPort.WriteLine(String.Format("L0,{0}", i));
-			i = (int) (50 + (49 * Math.Cos (Time.time * 4)));
-			serialPort.WriteLine(String.Format("L1,{0}", i));
+			serialPort.WriteLine("L" + led + "," + brightness);
 		}
 	}
 	
-	
-	private void PrintBuffer(String prefix, byte[] buffer, int length)
+	private void setLed(int led, int brightness, int interval, int ratio)
 	{
-		String strOut = prefix;
-		for ( int i = 0 ; i < length ; i++ )
+		if ( IsConnected() )
 		{
-			strOut += String.Format(" {0:X2}", buffer[i]);
-			if ( (buffer[i] >= 32) && (buffer[i] < 128) )
-			{
-				strOut += ":" + (char) buffer[i];
-			}
+			serialPort.WriteLine("L" + led + "," + brightness + "," + interval + "," + ratio);
 		}
-		Debug.Log(strOut);
 	}
 	
+	private void setText(int line, String text)
+	{
+		if ( IsConnected() )
+		{
+			serialPort.WriteLine("T" + line + ",0,\"" + text + "\"");
+		}
+	}
+
+	private void clearText()
+	{
+		setText(0, "                ");
+		setText(1, "                ");
+	}
 	
-	private SerialPort serialPort = null;
+	private SerialPort                 serialPort  = null;
+	private VehicleData                vehicleData = null;
+	private VehicleSafetyControl.State oldState;
 }
