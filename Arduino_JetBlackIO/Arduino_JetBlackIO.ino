@@ -1,15 +1,19 @@
 /**
  * JetBlack IO Box
  *
- * @version 1.0 - 2012.11.14: Created
  * @author  Stefan Marks, Marcus Ball
- *
+ * @version 1.0 - 2012.11.14: - Created
+ * @version 1.1 - 2012.11.16: - Merged LED and LCD projects
+ * @version 1.2 - 2012.11.20: - Restructured the code, removed unnecessary or duplicate variables
+ *                            - Changed LCD variable to pointer which is NULL if no LCD is connected
+ *                            - Added handshake characters to text command
+ *                            - Added methods for checking parameters and reading string parameters
  *
  * Command set:
  * E               : Echo version number
  * La,b[,c[,d]]    : Set LED a brightness to b (00-99) (and blink interval to c, and blink ratio to d)
  * la              : Get brightness of LED a
- * T,x,y,z "string": Set text on LCD display, set to location row(x) and column(y) of where to start writing
+ * Tx,y,z "string" : Set text on LCD display, set to location row(x) and column(y) of where to start writing
  *                   turn screen on/off by sending 0 (on) or 1(off) as z. i.e. T101"hi" prints to row 1, column 0 with screen on                
  * 
  * Return value: "+" or value if command successful, "!" if an error occured
@@ -21,7 +25,8 @@
 #include "Adafruit_RGBLCDShield.h"
  
  // version of the IO box
-const char MODULE_VERSION[] = "1.0";
+const char MODULE_NAME[]    = "JetBlack IO-Box";
+const char MODULE_VERSION[] = "v1.2";
 
 // array with LEDs
 LED*      arrLEDs[] = {new AnalogLED(3), 
@@ -34,24 +39,20 @@ LED*      arrLEDs[] = {new AnalogLED(3),
                       };
 const int numLEDs = sizeof(arrLEDs) / sizeof(arrLEDs[0]);
 
-// lcd and text initialization
-Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
+// LCD and text initialization
+Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
 char incomingString[25]; // Set some space for the string (25 characters)
-int selection = 0; 
-int NEWLINE = 10;
-//default row and column locations set to 0
-int row = 0, column = 0;
-boolean connectedLCD = false;
+int  row = 0, column = 0; //default row and column locations set to 0
 
-//Predefined #defines for LCD backlight color
-#define BLACK 0x0
-#define RED 0x1
-#define YELLOW 0x3
-#define GREEN 0x2
-#define TEAL 0x6
-#define BLUE 0x4
-#define VIOLET 0x5
-#define WHITE 0x7
+// Predefined constants for LCD backlight color
+#define LCD_BLACK  0x0
+#define LCD_RED    0x1
+#define LCD_YELLOW 0x3
+#define LCD_GREEN  0x2
+#define LCD_TEAL   0x6
+#define LCD_BLUE   0x4
+#define LCD_VIOLET 0x5
+#define LCD_WHITE  0x7
 
 
 // constants for communication
@@ -66,16 +67,23 @@ byte       rxBufferIdx = 0;
 byte       rxReadIdx   = 0;
 const byte rxBufferMax = sizeof(rxBuffer) / sizeof(rxBuffer[0]);
 
+
+/********************************************************************************
+ * Setup and loop 
+ ********************************************************************************/
+
 /**
  * Startup of the I/O box code.
  */
 void setup()
 {
+  // initialise the LCD (if present)
   initializeLCD();
+  
   // initialize serial communication at maximum bitrate
   Serial.begin(115200);
-  connectedLCD = checkConnection();
 }
+
 
 /**
  * Main loop of the IO box code.
@@ -90,6 +98,10 @@ void loop()
   }
 }
 
+
+/********************************************************************************
+ * Methods for receiving serial data and reading parameters
+ ********************************************************************************/
 
 /**
  * This method is called whenever a byte over a the serial line is received.
@@ -106,23 +118,14 @@ void serialEvent()
     // did we receive a CR or LF?
     if ( (rxIn == CHAR_LF) || (rxIn == CHAR_CR) )     
     {
-      // look at what command it is
+      // look at what the received command is
       switch ( readChar() )
       {
         // proper commands
         case 'E': processEchoCommand(); break;
         case 'l': processGetLedBrightnessCommand(); break;
         case 'L': processSetLedBrightnessCommand(); break;
-        case 'T': 
-                  if(connectedLCD)
-                  {
-                    processSetLcdTextCommand();
-                  }
-                  else
-                  {
-                    Serial.println("LCD is not connected");
-                  }
-                  break;
+        case 'T': processSetLcdTextCommand(); break;
         
         // ignore extraneous bytes
         case CHAR_LF: break;
@@ -143,6 +146,7 @@ void serialEvent()
   }
 }
 
+
 /**
  * Returns the number of characters available in the receive buffer.
  *
@@ -153,6 +157,7 @@ byte charsAvailable()
   return rxBufferIdx - rxReadIdx;
 }
 
+
 /**
  * Reads the next character from the receive buffer
  * and advances the read pointer.
@@ -161,14 +166,45 @@ byte charsAvailable()
  */
 char readChar()
 {
+  char c = pollChar();
+  // is there a next character?
+  if ( c != '\0' )
+  {
+    // if so, advance read pointer
+    rxReadIdx++;
+  }
+  return c;
+}
+
+
+/**
+ * Reads the next character from the receive buffer
+ * but does not advance the read pointer.
+ *
+ * @return next received character or '\0' if there is no next character
+ */
+char pollChar()
+{
   char c = '\0';
   // is there a next character?
   if ( charsAvailable() > 0 ) 
   {
     c = rxBuffer[rxReadIdx];
-    rxReadIdx++;
   }
   return c;
+}
+
+
+/**
+ * Checks if there is a next parameter and if it is a number.
+ *
+ * @return <code>true</code> if there is a next integer parameter,
+ *         <code>false</code> if not
+ */
+boolean hasInt()
+{
+  char c = pollChar();
+  return (c >= '0') && (c <= '9');
 }
 
 
@@ -203,13 +239,63 @@ int readInt()
 
 
 /**
+ * Checks if there is a next parameter and if it is a string.
+ *
+ * @return <code>true</code> if there is a next string parameter,
+ *         <code>false</code> if not
+ */
+boolean hasString()
+{
+  char c = pollChar();
+  return (c == '"');
+}
+
+
+/**
+ * Reads a string enclosed in quotation marks from the receive buffer
+ * and advances the read pointer accordingly.
+ *
+ * @return next received string or an empty string if there is no next string
+ */
+String readString()
+{
+  String str = "";
+  // needs to start with a "
+  if ( readChar() == '"' )
+  {
+    // read characters to the next "
+    while ( charsAvailable() > 0 ) 
+    {
+      char c = readChar();
+      if ( c != '"' )
+      {
+        str += c;
+      }
+      else
+      {
+        // found the terminating "
+        break;
+      }
+    }
+  }
+  return str;
+}
+
+
+/********************************************************************************
+ * Methods for processing commands
+ ********************************************************************************/
+
+/**
  * ECHO command was sent: return ID and serial number
  */
 void processEchoCommand()
 {
-  Serial.print("JetBlack IO v"); 
+  Serial.print(MODULE_NAME); 
+  Serial.print(" ");
   Serial.println(MODULE_VERSION);
 }
+
 
 /**
  * Gets LED brightness
@@ -228,25 +314,66 @@ void processGetLedBrightnessCommand()
     Serial.println(ERROR_CHAR);
   }
 }
+ 
 
 /**
- * Called to initialize LCD panel and set default text as JetBlack Simulator
+ * Sets the LED brightness (and optionally blink parameters).
+ * La,b[,c[,d]] : a=LED number, b=brightness (0-99), c=blink interval in ms, d=blink ratio (0-99)
+ */
+void processSetLedBrightnessCommand()
+{
+  int ledIdx     = readInt(); // LED index is first parameter
+  int brightness = readInt(); // LED brightness is second parameter
+  if ( (ledIdx >= 0) && (ledIdx <= numLEDs) && (brightness >= 0) )
+  {
+    arrLEDs[ledIdx]->setBrightness(brightness);
+    if ( hasInt() )
+    {
+      // optional blink interval in ms
+      int interval = readInt();
+      arrLEDs[ledIdx]->setBlinkInterval(interval);
+    }
+    if ( hasInt() )
+    {
+      // optional blink ratio in percent
+      int ratio = readInt();
+      arrLEDs[ledIdx]->setBlinkRatio(ratio);
+    }
+    Serial.println(SUCCESS_CHAR);
+  }
+  else
+  {
+    Serial.println(ERROR_CHAR);
+  }
+}
+
+
+/**
+ * Checks if the LCD panel is connected.
+ * If so, initialises the LCD panel and sets the default text to the module name and version.
  */
 void initializeLCD()
 {
-  // set up the LCD's number of columns and rows: 
-  lcd.begin(16, 2);
-  //set the cursor to the 0 0 position, top left
-  lcd.setCursor(0,0);
-  //print JetBlck on the top line
-  lcd.print("JetBlack");
-  //move cursor to the bottom line
-  lcd.setCursor(0,1);
-  //Print Simulator
-  lcd.print("Simulator");
-  //Set the backlight to white
-  lcd.setBacklight(WHITE); 
+  if ( checkLcdConnection() )
+  {
+    pLCD = new Adafruit_RGBLCDShield();
+    
+    // set up the LCD's number of columns and rows: 
+    pLCD->begin(16, 2);
+    
+    // set the cursor to the top left position
+    pLCD->setCursor(0,0);
+    // print module name on the top line
+    pLCD->print(MODULE_NAME);
+    // move cursor to the bottom line
+    pLCD->setCursor(0,1);
+    // print version number
+    pLCD->print(MODULE_VERSION);
+    // set the backlight to white
+    pLCD->setBacklight(LCD_WHITE); 
+  }
 }
+
 
 /**
  * Sets the text to display on the LCD panel
@@ -254,6 +381,13 @@ void initializeLCD()
  */
 void processSetLcdTextCommand()
 {  
+  if ( pLCD == NULL )
+  {
+    // no LCD connected -> get me out of here
+    Serial.println(ERROR_CHAR);
+    return;
+  }
+  
   char nextChar = ' ';
   column = 0, row = 0;
   boolean rowDone = false, columnDone = false, backLightDone = false;
@@ -278,17 +412,17 @@ void processSetLcdTextCommand()
     {
       if(nextChar == '0')
       {
-         lcd.setBacklight(BLACK);
+         pLCD->setBacklight(LCD_BLACK);
       }
       else
       {
-         lcd.setBacklight(WHITE); 
+         pLCD->setBacklight(LCD_WHITE); 
       }
       backLightDone = true;
     } 
   }
   
-    lcd.setCursor(column, row);
+    pLCD->setCursor(column, row);
     
     //Now we check to see if any quotation marks are present
     //only print strings that begin with a quotation    
@@ -296,15 +430,17 @@ void processSetLcdTextCommand()
     {
       processText();
     }
-    
+ 
+  // all went well (?)
+  Serial.println(SUCCESS_CHAR);  
 }
 
+
 /**
-  * function to process the text to be displayed
-  */
+ * Function to process the text to be displayed
+ */
 void processText()
 {
-  
   int index = 0;
   char incomingChar = '.';
   // While serial data is being received
@@ -328,10 +464,10 @@ void processText()
   }
   if (index  > 0) 
   { 
-   lcd.print(incomingString); 
+    pLCD->print(incomingString); 
     for(int i = 0; i < index; i++)
     {      
-      if(incomingString[i] == NEWLINE)
+      if(incomingString[i] == CHAR_CR)
       {
         //lcd.setCursor(column , row++);
       }
@@ -348,61 +484,33 @@ void processText()
   } 
 }
 
+
 /**
-  * checks the LCD's default i2c to see if it is connected
-  */
-boolean checkConnection() {
-  Serial.println ();
-  Serial.println ("Checking for LCD");
-  byte count = 0;
+ * Checks the LCD's default i2c to see if it is connected
+ *
+ * @return <code>true</code> if LCD is connected, <code>false</code> if not
+ */
+boolean checkLcdConnection()
+{
   boolean found = false;
+  
+  // Serial.println();
+  // Serial.println("Checking for LCD");
   
   Wire.begin();
   Wire.beginTransmission(32);
-  if(Wire.endTransmission() == 0)
+  if ( Wire.endTransmission() == 0 )
   {
-    Serial.print("LCD Device connected at ");
-    Serial.println(32, HEX);
+    // Serial.print("LCD Device connected at ");
+    // Serial.println(32, HEX);
     found = true;
   }
-  
-  if(!found)
+  else  
   {
-     Serial.println("LCD was not found"); 
+     //Serial.println("LCD was not found"); 
   }
   return found;
 }
 
- 
 
-/**
- * Sets the LED brightness (and optionally blink parameters).
- * La,b[,c[,d]] : a=LED number, b=brightness (0-99), c=blink interval in ms, d=blink ratio (0-99)
- */
-void processSetLedBrightnessCommand()
-{
-  int ledIdx     = readInt(); // LED index is first parameter
-  int brightness = readInt(); // LED brightness is second parameter
-  if ( (ledIdx >= 0) && (ledIdx <= numLEDs) && (brightness >= 0) )
-  {
-    arrLEDs[ledIdx]->setBrightness(brightness);
-    if ( charsAvailable() > 0 )
-    {
-      // optional blink interval in ms
-      int interval = readInt();
-      arrLEDs[ledIdx]->setBlinkInterval(interval);
-    }
-    if ( charsAvailable() > 0 )
-    {
-      // optional blink ratio in percent
-      int ratio = readInt();
-      arrLEDs[ledIdx]->setBlinkRatio(ratio);
-    }
-    Serial.println(SUCCESS_CHAR);
-  }
-  else
-  {
-    Serial.println(ERROR_CHAR);
-  }
-}
 
