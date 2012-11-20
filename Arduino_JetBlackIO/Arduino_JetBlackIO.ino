@@ -43,6 +43,9 @@ const int numLEDs = sizeof(arrLEDs) / sizeof(arrLEDs[0]);
 Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
 char incomingString[25]; // Set some space for the string (25 characters)
 int  row = 0, column = 0; //default row and column locations set to 0
+uint8_t oldButtons;
+int cursorIterator = 0; // Iterator for large font locations
+boolean largeFont = false;
 
 // Predefined constants for LCD backlight color
 #define LCD_BLACK  0x0
@@ -67,6 +70,16 @@ byte       rxBufferIdx = 0;
 byte       rxReadIdx   = 0;
 const byte rxBufferMax = sizeof(rxBuffer) / sizeof(rxBuffer[0]);
 
+// the 8 arrays that form each segment of the large custom numbers
+byte LT[8]  = {B00111, B01111, B11111, B11111, B11111, B11111, B11111, B11111};
+byte UB[8]  = {B11111, B11111, B11111, B00000, B00000, B00000, B00000, B00000};
+byte RT[8]  = {B11100, B11110, B11111, B11111, B11111, B11111, B11111, B11111};
+byte LL[8]  = {B11111, B11111, B11111, B11111, B11111, B11111, B01111, B00111};
+byte LB[8]  = {B00000, B00000, B00000, B00000, B00000, B11111, B11111, B11111};
+byte LR[8]  = {B11111, B11111, B11111, B11111, B11111, B11111, B11110, B11100};
+byte UMB[8] = {B11111, B11111, B11111, B00000, B00000, B00000, B11111, B11111};
+byte LMB[8] = {B11111, B00000, B00000, B00000, B00000, B11111, B11111, B11111};
+
 
 /********************************************************************************
  * Setup and loop 
@@ -90,6 +103,7 @@ void setup()
  */
 void loop() 
 {
+  processLCDButtons();
   unsigned long time = millis();
   // update the LEDs
   for ( int i = 0 ; i < numLEDs ; i++ ) 
@@ -372,6 +386,15 @@ void initializeLCD()
     // set the backlight to white
     pLCD->setBacklight(LCD_WHITE); 
   }
+  // assignes each segment a write number
+  pLCD->createChar(0,LT);
+  pLCD->createChar(1,UB);
+  pLCD->createChar(2,RT);
+  pLCD->createChar(3,LL);
+  pLCD->createChar(4,LB);
+  pLCD->createChar(5,LR);
+  pLCD->createChar(6,UMB);
+  pLCD->createChar(7,LMB);
 }
 
 
@@ -469,18 +492,37 @@ void processText()
     {      
       if(incomingString[i] == CHAR_CR)
       {
-        //lcd.setCursor(column , row++);
+        //pLCD->setCursor(column , row++);
       }
       if(incomingString[i] == '\0')
       {
         break;
       }
-      //lcd.setCursor(xLocation+i,yLocation);
-      //lcd.setCursor(column , row + i);
-      //lcd.print(incomingString[i]); 
-      //lcd.setBacklight(BLUE);
+      
+      if(largeFont)
+      {
+        switch(incomingString[i] - '0') {
+            case 0: custom0();  cursorIterator += 4;  break;
+            case 1: custom1();  cursorIterator += 4;  break;
+            case 2: custom2();  cursorIterator += 4;  break;
+            case 3: custom3();  cursorIterator += 4;  break;
+            case 4: custom4();  cursorIterator += 4;  break;
+            case 5: custom5();  cursorIterator += 4;  break;
+            case 6: custom6();  cursorIterator += 4;  break;
+            case 7: custom7();  cursorIterator += 4;  break;
+            case 8: custom8();  cursorIterator += 4;  break;
+            case 9: custom9();  cursorIterator += 4;  break;
+            default: break;
+        }       
+      }
+      else
+      {
+         pLCD->setCursor(column + i , row);
+         pLCD->print(incomingString[i]);  
+      }
       incomingString[i] = '\0';
-    }    
+    } 
+   cursorIterator = 0;   
   } 
 }
 
@@ -512,5 +554,148 @@ boolean checkLcdConnection()
   return found;
 }
 
+/**
+  * Checks if any buttons were pressed during each update and reacts accordingly
+  *                               --Current Button Configurations--
+  * Select Button - Switches size of fonts
+  */
+void processLCDButtons()
+{
+  uint8_t newButtons = pLCD->readButtons();
+  uint8_t buttons = newButtons & ~oldButtons;
+  oldButtons = newButtons;
+  if (buttons) 
+  {
+    if (buttons & BUTTON_SELECT) 
+    {
+      if(largeFont)
+      {
+        //Serial.println("Large font off");
+        largeFont = false;
+      }
+      else
+      {
+        //Serial.println("Large font on");
+        largeFont = true;
+      }
+    }
+  } 
+}
 
+ 
+// -- Large number character functions --  Will need to be refactored 
+
+/**
+  * functions which create the custom number font
+  */  
+void custom0()
+{ // uses segments to build the number 0
+  pLCD->setCursor(cursorIterator, 0); // set cursor to column 0, line 0 (first row)
+  pLCD->write(0);  // call each segment to create
+  pLCD->write(1);  // top half of the number
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator, 1); // set cursor to colum 0, line 1 (second row)
+  pLCD->write(3);  // call each segment to create
+  pLCD->write(4);  // bottom half of the number
+  pLCD->write(5);
+}
+
+void custom1()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(1);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator+1,1);
+  pLCD->write(5);
+}
+
+void custom2()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(6);
+  pLCD->write(6);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator, 1);
+  pLCD->write(3);
+  pLCD->write(7);
+  pLCD->write(7);
+}
+
+void custom3()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(6);
+  pLCD->write(6);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator, 1);
+  pLCD->write(7);
+  pLCD->write(7);
+  pLCD->write(5); 
+}
+
+void custom4()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(3);
+  pLCD->write(4);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator+2, 1);
+  pLCD->write(5);
+}
+
+void custom5()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(0);
+  pLCD->write(6);
+  pLCD->write(6);
+  pLCD->setCursor(cursorIterator, 1);
+  pLCD->write(7);
+  pLCD->write(7);
+  pLCD->write(5);
+}
+
+void custom6()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(0);
+  pLCD->write(6);
+  pLCD->write(6);
+  pLCD->setCursor(cursorIterator, 1);
+  pLCD->write(3);
+  pLCD->write(7);
+  pLCD->write(5);
+}
+
+void custom7()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(1);
+  pLCD->write(1);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator+1, 1);
+  pLCD->write(0);
+}
+
+void custom8()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(0);
+  pLCD->write(6);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator, 1);
+  pLCD->write(3);
+  pLCD->write(7);
+  pLCD->write(5);
+}
+
+void custom9()
+{
+  pLCD->setCursor(cursorIterator,0);
+  pLCD->write(0);
+  pLCD->write(6);
+  pLCD->write(2);
+  pLCD->setCursor(cursorIterator+2, 1);
+  pLCD->write(5);
+}
 
