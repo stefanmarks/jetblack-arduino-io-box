@@ -8,6 +8,8 @@
  *                            - Changed LCD variable to pointer which is NULL if no LCD is connected
  *                            - Added handshake characters to text command
  *                            - Added methods for checking parameters and reading string parameters
+ * @version 1.3 - 2012.11.22: - Added big numeric characters
+ *                            - Refactored LED class
  *
  * Command set:
  * E               : Echo version number
@@ -23,21 +25,23 @@
 #include "LED.h"
 #include "Adafruit_MCP23017.h"
 #include "Adafruit_RGBLCDShield.h"
- 
- // version of the IO box
-const char MODULE_NAME[]    = "JetBlack IO-Box";
-const char MODULE_VERSION[] = "v1.2";
 
+// version of the IO box
+const char MODULE_NAME[]    = "JetBlack IO-Box";
+const char MODULE_VERSION[] = "v1.3";
+
+// macro for the size of an array
+#define ARRSIZE(x) (sizeof(x) / sizeof(x[0] ))
+ 
 // array with LEDs
-LED*      arrLEDs[] = {new AnalogLED(3), 
-                       new AnalogLED(5), 
-                       new AnalogLED(6), 
-                       new AnalogLED(9), 
-                       new AnalogLED(10), 
-                       new AnalogLED(11), 
-                       new DigitalLED(13)
-                      };
-const int numLEDs = sizeof(arrLEDs) / sizeof(arrLEDs[0]);
+LED* arrLEDs[] = { new AnalogLED(3), 
+                   new AnalogLED(5), 
+                   new AnalogLED(6), 
+                   new AnalogLED(9), 
+                   new AnalogLED(10), 
+                   new AnalogLED(11), 
+                   new DigitalLED(13)
+                 };
 
 // LCD and text initialization
 Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
@@ -71,14 +75,15 @@ byte       rxReadIdx   = 0;
 const byte rxBufferMax = sizeof(rxBuffer) / sizeof(rxBuffer[0]);
 
 // the 8 arrays that form each segment of the large custom numbers
-byte LT[8]  = {B00111, B01111, B11111, B11111, B11111, B11111, B11111, B11111};
-byte UB[8]  = {B11111, B11111, B11111, B00000, B00000, B00000, B00000, B00000};
-byte RT[8]  = {B11100, B11110, B11111, B11111, B11111, B11111, B11111, B11111};
-byte LL[8]  = {B11111, B11111, B11111, B11111, B11111, B11111, B01111, B00111};
-byte LB[8]  = {B00000, B00000, B00000, B00000, B00000, B11111, B11111, B11111};
-byte LR[8]  = {B11111, B11111, B11111, B11111, B11111, B11111, B11110, B11100};
-byte UMB[8] = {B11111, B11111, B11111, B00000, B00000, B00000, B11111, B11111};
-byte LMB[8] = {B11111, B00000, B00000, B00000, B00000, B11111, B11111, B11111};
+byte bigNumberSegments[][8] = { { B00111, B01111, B11111, B11111, B11111, B11111, B11111, B11111 },
+                                { B11111, B11111, B11111, B00000, B00000, B00000, B00000, B00000 },
+                                { B11100, B11110, B11111, B11111, B11111, B11111, B11111, B11111 },
+                                { B11111, B11111, B11111, B11111, B11111, B11111, B01111, B00111 },
+                                { B00000, B00000, B00000, B00000, B00000, B11111, B11111, B11111 },
+                                { B11111, B11111, B11111, B11111, B11111, B11111, B11110, B11100 },
+                                { B11111, B11111, B11111, B00000, B00000, B00000, B11111, B11111 },
+                                { B11111, B00000, B00000, B00000, B00000, B11111, B11111, B11111 } 
+                              };
 
 
 /********************************************************************************
@@ -106,7 +111,7 @@ void loop()
   processLCDButtons();
   unsigned long time = millis();
   // update the LEDs
-  for ( int i = 0 ; i < numLEDs ; i++ ) 
+  for ( int i = 0 ; i < ARRSIZE(arrLEDs) ; i++ ) 
   {
     arrLEDs[i]->update(time);
   }
@@ -318,7 +323,7 @@ void processEchoCommand()
 void processGetLedBrightnessCommand()
 {
   int ledIdx = readInt(); // LED index is first parameter
-  if ( (ledIdx >= 0) && (ledIdx < numLEDs) )
+  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) )
   {
     // return LED brightness
     Serial.println(arrLEDs[ledIdx]->getBrightness());
@@ -338,7 +343,7 @@ void processSetLedBrightnessCommand()
 {
   int ledIdx     = readInt(); // LED index is first parameter
   int brightness = readInt(); // LED brightness is second parameter
-  if ( (ledIdx >= 0) && (ledIdx <= numLEDs) && (brightness >= 0) )
+  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) && (brightness >= 0) )
   {
     arrLEDs[ledIdx]->setBrightness(brightness);
     if ( hasInt() )
@@ -385,16 +390,13 @@ void initializeLCD()
     pLCD->print(MODULE_VERSION);
     // set the backlight to white
     pLCD->setBacklight(LCD_WHITE); 
+  
+    // define custom segments for big numbers
+    for ( int i = 0 ; i < ARRSIZE(bigNumberSegments) ; i++ )
+    {
+      pLCD->createChar(i, bigNumberSegments[i]);
+    }
   }
-  // assignes each segment a write number
-  pLCD->createChar(0,LT);
-  pLCD->createChar(1,UB);
-  pLCD->createChar(2,RT);
-  pLCD->createChar(3,LL);
-  pLCD->createChar(4,LB);
-  pLCD->createChar(5,LR);
-  pLCD->createChar(6,UMB);
-  pLCD->createChar(7,LMB);
 }
 
 
@@ -536,29 +538,20 @@ boolean checkLcdConnection()
 {
   boolean found = false;
   
-  // Serial.println();
-  // Serial.println("Checking for LCD");
-  
   Wire.begin();
   Wire.beginTransmission(32);
   if ( Wire.endTransmission() == 0 )
   {
-    // Serial.print("LCD Device connected at ");
-    // Serial.println(32, HEX);
     found = true;
-  }
-  else  
-  {
-     //Serial.println("LCD was not found"); 
   }
   return found;
 }
 
 /**
-  * Checks if any buttons were pressed during each update and reacts accordingly
-  *                               --Current Button Configurations--
-  * Select Button - Switches size of fonts
-  */
+ * Checks if any buttons were pressed during each update and reacts accordingly
+ *                               --Current Button Configurations--
+ * Select Button - Switches size of fonts
+ */
 void processLCDButtons()
 {
   uint8_t newButtons = pLCD->readButtons();
