@@ -77,11 +77,9 @@ class LED
   protected:
   
     /**
-     * Creates a LED class for a specific I/O pin.
-     *
-     * @param pinNo the number of the Arduino pin to use for this LED
+     * Creates a generic LED class.
      */
-    LED(byte pinNo);
+    LED();
     
   private:
   
@@ -92,7 +90,6 @@ class LED
     
   protected:
   
-    byte          pinNo;
     byte          brightness;
     unsigned int  interval;
     byte          ratio;
@@ -123,6 +120,10 @@ class DigitalLED : public LED
   
     virtual void updateLedState();
 
+  private:
+  
+    byte pinNo;
+
 };
 
 
@@ -143,6 +144,11 @@ class AnalogLED : public LED
   private:
   
     virtual void updateLedState();
+
+  private:
+  
+    byte pinNo;
+
 };
 
 #endif // LED_H_INCLUDED

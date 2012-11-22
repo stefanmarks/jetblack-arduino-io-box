@@ -7,8 +7,13 @@
  
 #include "LED.h"
 
-AnalogLED::AnalogLED(byte pinNo) : LED(pinNo)
+AnalogLED::AnalogLED(byte pinNo) : LED()
 {
+  this->pinNo = pinNo;
+
+  // prepare pin to output signal
+  pinMode(pinNo, OUTPUT); 
+
   updateLedState();
 }
 

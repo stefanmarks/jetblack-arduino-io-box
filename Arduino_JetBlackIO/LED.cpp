@@ -7,10 +7,8 @@
  
 #include "LED.h"
 
-LED::LED(byte pinNo)
+LED::LED()
 {
-  this->pinNo = pinNo;
-  
   // initialise variables
   brightness = 0;
   interval   = 0;
@@ -18,9 +16,6 @@ LED::LED(byte pinNo)
   onTime     = 0;
   offTime    = 0;
   state      = true;
-
-  // prepare pin to output signal
-  pinMode(pinNo, OUTPUT); 
 }
 
 

@@ -7,8 +7,13 @@
  
 #include "LED.h"
 
-DigitalLED::DigitalLED(byte pinNo) : LED(pinNo)
+DigitalLED::DigitalLED(byte pinNo) : LED()
 {
+  this->pinNo = pinNo;
+
+  // prepare pin to output signal
+  pinMode(pinNo, OUTPUT); 
+
   updateLedState();
 }
 
