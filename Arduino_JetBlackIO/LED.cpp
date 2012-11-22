@@ -1,5 +1,5 @@
 /**
- * Abstract base class for LED control
+ * LED base class implementation.
  *
  * @version 1.0 - 2012.11.14: Created
  * @author  Stefan Marks

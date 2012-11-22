@@ -22,7 +22,9 @@
  */
  
 #include <Wire.h>
-#include "LED.h"
+#include "DigitalButton.h"
+#include "DigitalLED.h"
+#include "AnalogLED.h"
 #include "Adafruit_MCP23017.h"
 #include "Adafruit_RGBLCDShield.h"
 
@@ -42,6 +44,11 @@ LED* arrLEDs[] = { new AnalogLED(3),
                    new AnalogLED(11), 
                    new DigitalLED(13)
                  };
+
+Button* arrButtons[] = { new DigitalButton(2), 
+                         new DigitalButton(4), 
+                         new DigitalButton(7)
+                       };
 
 // LCD and text initialization
 Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
@@ -109,11 +116,18 @@ void setup()
 void loop() 
 {
   processLCDButtons();
+  
   unsigned long time = millis();
   // update the LEDs
   for ( int i = 0 ; i < ARRSIZE(arrLEDs) ; i++ ) 
   {
-    arrLEDs[i]->update(time);
+    if ( arrLEDs[i] != NULL ) arrLEDs[i]->update(time);
+  }
+  // update the Buttons
+  for ( int i = 0 ; i < ARRSIZE(arrButtons) ; i++ ) 
+  {
+    if ( arrButtons[i] != NULL ) arrButtons[i]->update(time);
+    if ( arrButtons[i]->hasChanged() ) Serial.println("changed " + i + arrButtons[i]->isPressed());
   }
 }
 

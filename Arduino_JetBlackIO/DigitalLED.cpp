@@ -1,11 +1,11 @@
 /**
- * Class file for digital LED control
+ * Digital LED class implementation.
  *
  * @version 1.0 - 2012.11.14: Created
  * @author  Stefan Marks
  */
  
-#include "LED.h"
+#include "DigitalLED.h"
 
 DigitalLED::DigitalLED(byte pinNo) : LED()
 {

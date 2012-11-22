@@ -1,11 +1,11 @@
 /**
- * Class file for analog LED control
+ * Analog LED class implementation.
  *
  * @version 1.0 - 2012.11.14: Created
  * @author  Stefan Marks
  */
  
-#include "LED.h"
+#include "AnalogLED.h"
 
 AnalogLED::AnalogLED(byte pinNo) : LED()
 {
