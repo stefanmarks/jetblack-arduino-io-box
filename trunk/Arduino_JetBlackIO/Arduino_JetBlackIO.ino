@@ -11,6 +11,7 @@
  * @version 1.3 - 2012.11.22: - Added big numeric characters
  *                            - Refactored LED class
  * @version 1.4 - 2012.11.23: - Added button command
+ *                            - Refactored big numbers code
  *
  * Command set:
  * E               : Echo version number
@@ -92,6 +93,18 @@ byte bigNumberSegments[][8] = { { B00111, B01111, B11111, B11111, B11111, B11111
                                 { B11111, B11111, B11111, B11111, B11111, B11111, B11110, B11100 },
                                 { B11111, B11111, B11111, B00000, B00000, B00000, B11111, B11111 },
                                 { B11111, B00000, B00000, B00000, B00000, B11111, B11111, B11111 } 
+                              };
+// the 10 arrays for building a big number out of the special characters
+byte bigNumberChars[10][6] =  { { 0,  1,  2,   3,  4,  5 }, // 0
+                                { 1,  2, 32,   4,255,  4 }, // 1
+                                { 6,  6,  2,   3,  7,  7 }, // 2
+                                { 6,  6,  2,   7,  7,  5 }, // 3
+                                { 3,  4,  2,  32, 32,  5 }, // 4
+                                { 0,  6,  6,   7,  7,  5 }, // 5
+                                { 0,  6,  6,   3,  7,  5 }, // 6
+                                { 1,  1,  2,  32,  0, 32 }, // 7
+                                { 0,  6,  2,   3,  7,  5 }, // 8
+                                { 0,  6,  2,   4,  4,  5 }  // 9
                               };
 
 
@@ -571,19 +584,20 @@ void processText()
       
       if(largeFont)
       {
-        switch(incomingString[i] - '0') {
-            case 0: custom0();  cursorIterator += 4;  break;
-            case 1: custom1();  cursorIterator += 4;  break;
-            case 2: custom2();  cursorIterator += 4;  break;
-            case 3: custom3();  cursorIterator += 4;  break;
-            case 4: custom4();  cursorIterator += 4;  break;
-            case 5: custom5();  cursorIterator += 4;  break;
-            case 6: custom6();  cursorIterator += 4;  break;
-            case 7: custom7();  cursorIterator += 4;  break;
-            case 8: custom8();  cursorIterator += 4;  break;
-            case 9: custom9();  cursorIterator += 4;  break;
-            default: break;
-        }       
+        int num = incomingString[i] - '0';
+        if ( (num >=0) && (num <= 9) )
+        {
+          byte arrIter = 0; // iterator through character array
+          for ( byte y = 0 ; y < 2 ; y++ ) // two lines
+          {
+            pLCD->setCursor(cursorIterator, y);
+            for ( byte x = 0 ; x < 3 ; x++ ) // three chars each line
+            {
+              pLCD->write(bigNumberChars[num][arrIter++]);
+            }
+          }
+          cursorIterator += 4; // advance cursor 4 spaces
+        }
       }
       else
       {
@@ -641,122 +655,5 @@ void processLCDButtons()
       }
     }
   } 
-}
-
- 
-// -- Large number character functions --  Will need to be refactored 
-
-/**
-  * functions which create the custom number font
-  */  
-void custom0()
-{ // uses segments to build the number 0
-  pLCD->setCursor(cursorIterator, 0); // set cursor to column 0, line 0 (first row)
-  pLCD->write(0);  // call each segment to create
-  pLCD->write(1);  // top half of the number
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator, 1); // set cursor to colum 0, line 1 (second row)
-  pLCD->write(3);  // call each segment to create
-  pLCD->write(4);  // bottom half of the number
-  pLCD->write(5);
-}
-
-void custom1()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(1);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator+1,1);
-  pLCD->write(5);
-}
-
-void custom2()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(6);
-  pLCD->write(6);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator, 1);
-  pLCD->write(3);
-  pLCD->write(7);
-  pLCD->write(7);
-}
-
-void custom3()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(6);
-  pLCD->write(6);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator, 1);
-  pLCD->write(7);
-  pLCD->write(7);
-  pLCD->write(5); 
-}
-
-void custom4()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(3);
-  pLCD->write(4);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator+2, 1);
-  pLCD->write(5);
-}
-
-void custom5()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(0);
-  pLCD->write(6);
-  pLCD->write(6);
-  pLCD->setCursor(cursorIterator, 1);
-  pLCD->write(7);
-  pLCD->write(7);
-  pLCD->write(5);
-}
-
-void custom6()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(0);
-  pLCD->write(6);
-  pLCD->write(6);
-  pLCD->setCursor(cursorIterator, 1);
-  pLCD->write(3);
-  pLCD->write(7);
-  pLCD->write(5);
-}
-
-void custom7()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(1);
-  pLCD->write(1);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator+1, 1);
-  pLCD->write(0);
-}
-
-void custom8()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(0);
-  pLCD->write(6);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator, 1);
-  pLCD->write(3);
-  pLCD->write(7);
-  pLCD->write(5);
-}
-
-void custom9()
-{
-  pLCD->setCursor(cursorIterator,0);
-  pLCD->write(0);
-  pLCD->write(6);
-  pLCD->write(2);
-  pLCD->setCursor(cursorIterator+2, 1);
-  pLCD->write(5);
 }
 
