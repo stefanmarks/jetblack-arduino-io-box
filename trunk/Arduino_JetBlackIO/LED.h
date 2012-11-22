@@ -11,7 +11,7 @@
 #include "Arduino.h"
 
 /**
- * Abstract base class for LED's connected to the board.
+ * Abstract base class for LEDs connected to the board.
  */
 class LED
 {
@@ -97,59 +97,6 @@ class LED
     unsigned long onTime, offTime;
 };
 
-
-/**
- * Class for LED's connected to purely digital pins of the board.
- * Digitally driven LED's cannot be set to intermediate brightnesses.
- * A brightness value >= 50 is interpreted as "on", otherwise as "off".
- */
-class DigitalLED : public LED
-{
-  public:
-  
-    /**
-     * Creates a digital LED class for a specific I/O pin.
-     *
-     * @param pinNo the number of the Arduino pin to use for this LED
-     */
-    DigitalLED(byte pinNo);
-    
-    virtual void setBrightness(byte brightness);
-
-  private:
-  
-    virtual void updateLedState();
-
-  private:
-  
-    byte pinNo;
-
-};
-
-
-/**
- * Class for LED's connected to analog pins of the board.
- */
-class AnalogLED : public LED
-{
-  public:
-
-    /**
-     * Creates an analog LED class for a specific I/O pin.
-     *
-     * @param pinNo the number of the Arduino pin to use for this LED
-     */
-    AnalogLED(byte pinNo);
-
-  private:
-  
-    virtual void updateLedState();
-
-  private:
-  
-    byte pinNo;
-
-};
 
 #endif // LED_H_INCLUDED
 
