@@ -215,6 +215,32 @@ char pollChar()
 
 
 /**
+ * Checks if there is a next parameter.
+ *
+ * @return <code>true</code> if there is a next parameter,
+ *         <code>false</code> if not
+ */
+boolean hasNextParameter()
+{
+  // skip any whitespace
+  boolean skipChar = false;
+  do
+  {
+    char c = pollChar();
+    skipChar = ( (c == ',') || (c == ' ') || (c == '\t') );
+    if ( skipChar )
+    {
+      // "consume" skippable characters
+      c = readChar();
+    }
+  } while ( (charsAvailable() > 0) && skipChar);
+    
+  // is there more inthe receive buffer? yes: must be a next parameter
+  return (charsAvailable() > 0);
+}
+
+
+/**
  * Checks if there is a next parameter and if it is a number.
  *
  * @return <code>true</code> if there is a next integer parameter,
@@ -229,7 +255,7 @@ boolean hasInt()
 
 /**
  * Reads the next integer value from the receive buffer
- * and advances the read pointer.
+ * and advances the read pointer to the last valid digit.
  *
  * @return next received integer or -1 if there is no next integer
  */
@@ -239,11 +265,12 @@ int readInt()
   boolean isNumeric;
   do 
   {
-    char c = readChar();
+    char c = pollChar();
     isNumeric = (c >= '0') && (c <= '9');
     
     if ( isNumeric )
     {
+      c = readChar(); // actually read the character
       // shift previous result one digit and add new digit
       if ( i < 0 )
       {
@@ -272,7 +299,7 @@ boolean hasString()
 
 /**
  * Reads a string enclosed in quotation marks from the receive buffer
- * and advances the read pointer accordingly.
+ * and advances the read pointer to the end of the terminating ".
  *
  * @return next received string or an empty string if there is no next string
  */
@@ -341,29 +368,30 @@ void processGetLedBrightnessCommand()
  */
 void processSetLedBrightnessCommand()
 {
-  int ledIdx     = readInt(); // LED index is first parameter
-  int brightness = readInt(); // LED brightness is second parameter
-  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) && (brightness >= 0) )
+  boolean success = false;
+  int ledIdx = readInt(); // LED index is first parameter
+  if ( hasNextParameter() && hasInt() )
   {
-    arrLEDs[ledIdx]->setBrightness(brightness);
-    if ( hasInt() )
+    int brightness = readInt(); // LED brightness is second parameter
+    if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) && (brightness >= 0) )
     {
-      // optional blink interval in ms
-      int interval = readInt();
-      arrLEDs[ledIdx]->setBlinkInterval(interval);
+      arrLEDs[ledIdx]->setBrightness(brightness);
+      if ( hasNextParameter() && hasInt() )
+      {
+        // optional blink interval in ms
+        int interval = readInt();
+        arrLEDs[ledIdx]->setBlinkInterval(interval);
+      }
+      if ( hasNextParameter() && hasInt() )
+      {
+        // optional blink ratio in percent
+        int ratio = readInt();
+        arrLEDs[ledIdx]->setBlinkRatio(ratio);
+      }
+      success = true;
     }
-    if ( hasInt() )
-    {
-      // optional blink ratio in percent
-      int ratio = readInt();
-      arrLEDs[ledIdx]->setBlinkRatio(ratio);
-    }
-    Serial.println(SUCCESS_CHAR);
   }
-  else
-  {
-    Serial.println(ERROR_CHAR);
-  }
+  Serial.println(success ? SUCCESS_CHAR : ERROR_CHAR);
 }
 
 
