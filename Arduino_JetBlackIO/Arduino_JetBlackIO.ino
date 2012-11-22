@@ -10,9 +10,11 @@
  *                            - Added methods for checking parameters and reading string parameters
  * @version 1.3 - 2012.11.22: - Added big numeric characters
  *                            - Refactored LED class
+ * @version 1.4 - 2012.11.23: - Added button command
  *
  * Command set:
  * E               : Echo version number
+ * ba              : Get state of button a (00:off, no change / 10: on, no change / 01:off, changed / 11:on, changed)
  * La,b[,c[,d]]    : Set LED a brightness to b (00-99) (and blink interval to c, and blink ratio to d)
  * la              : Get brightness of LED a
  * Tx,y,z "string" : Set text on LCD display, set to location row(x) and column(y) of where to start writing
@@ -30,7 +32,7 @@
 
 // version of the IO box
 const char MODULE_NAME[]    = "JetBlack IO-Box";
-const char MODULE_VERSION[] = "v1.3";
+const char MODULE_VERSION[] = "v1.4";
 
 // macro for the size of an array
 #define ARRSIZE(x) (sizeof(x) / sizeof(x[0] ))
@@ -56,7 +58,7 @@ char incomingString[25]; // Set some space for the string (25 characters)
 int  row = 0, column = 0; //default row and column locations set to 0
 uint8_t oldButtons;
 int cursorIterator = 0; // Iterator for large font locations
-boolean largeFont = false;
+boolean largeFont = true;
 
 // Predefined constants for LCD backlight color
 #define LCD_BLACK  0x0
@@ -127,7 +129,6 @@ void loop()
   for ( int i = 0 ; i < ARRSIZE(arrButtons) ; i++ ) 
   {
     if ( arrButtons[i] != NULL ) arrButtons[i]->update(time);
-    if ( arrButtons[i]->hasChanged() ) Serial.println("changed " + i + arrButtons[i]->isPressed());
   }
 }
 
@@ -156,6 +157,7 @@ void serialEvent()
       {
         // proper commands
         case 'E': processEchoCommand(); break;
+        case 'b': processGetButtonStateCommand(); break;
         case 'l': processGetLedBrightnessCommand(); break;
         case 'L': processSetLedBrightnessCommand(); break;
         case 'T': processSetLcdTextCommand(); break;
@@ -358,13 +360,37 @@ void processEchoCommand()
 
 
 /**
+ * Gets button state.
+ * ba : a=Button number
+ */
+void processGetButtonStateCommand()
+{
+  int buttonIdx = readInt(); // Button index is first parameter
+  if ( (buttonIdx >= 0) && 
+       (buttonIdx < ARRSIZE(arrButtons)) && 
+       (arrButtons[buttonIdx] != NULL) )
+  {
+    // return button state (0,1)
+    Serial.print(arrButtons[buttonIdx]->isPressed() ? '1' : '0');
+    // return button change flag (0,1)
+    Serial.println(arrButtons[buttonIdx]->hasChanged() ? '1' : '0');
+  }
+  else
+  {
+    Serial.println(ERROR_CHAR);
+  }
+}
+
+/**
  * Gets LED brightness
  * la : a=LED number
  */
 void processGetLedBrightnessCommand()
 {
   int ledIdx = readInt(); // LED index is first parameter
-  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) )
+  if ( (ledIdx >= 0) && 
+       (ledIdx < ARRSIZE(arrLEDs)) && 
+       (arrLEDs[ledIdx] != NULL) )
   {
     // return LED brightness
     Serial.println(arrLEDs[ledIdx]->getBrightness());
