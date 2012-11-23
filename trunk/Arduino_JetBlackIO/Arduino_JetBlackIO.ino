@@ -12,12 +12,14 @@
  *                            - Refactored LED class
  * @version 1.4 - 2012.11.23: - Added button command
  *                            - Refactored big numbers code
+ *                            - Added multicolour LEDs
  *
  * Command set:
  * E               : Echo version number
  * ba              : Get state of button a (00:off, no change / 10: on, no change / 01:off, changed / 11:on, changed)
- * La,b[,c[,d]]    : Set LED a brightness to b (00-99) (and blink interval to c, and blink ratio to d)
- * la              : Get brightness of LED a
+ * Ln,b[,i[,r]]    : Set LED n brightness to b (00-99) (and blink interval to i, and blink ratio to r)
+ * ln              : Get brightness of LED n
+ * Mn,r,g,b[,i[,r]]: Set multicolour LED n colour to r,g,b (00-99) (and blink interval to i, and blink ratio to r)
  * Tx,y,z "string" : Set text on LCD display, set to location row(x) and column(y) of where to start writing
  *                   turn screen on/off by sending 0 (on) or 1(off) as z. i.e. T101"hi" prints to row 1, column 0 with screen on                
  * 
@@ -28,6 +30,7 @@
 #include "DigitalButton.h"
 #include "DigitalLED.h"
 #include "AnalogLED.h"
+#include "MulticolourLED.h"
 #include "Adafruit_MCP23017.h"
 #include "Adafruit_RGBLCDShield.h"
 
@@ -39,19 +42,30 @@ const char MODULE_VERSION[] = "v1.4";
 #define ARRSIZE(x) (sizeof(x) / sizeof(x[0] ))
  
 // array with LEDs
-LED* arrLEDs[] = { new AnalogLED(3), 
-                   new AnalogLED(5), 
-                   new AnalogLED(6), 
-                   new AnalogLED(9), 
-                   new AnalogLED(10), 
-                   new AnalogLED(11), 
-                   new DigitalLED(13)
-                 };
+LED* arrLEDs[] = {
+  new AnalogLED(3), 
+  new AnalogLED(5), 
+  new AnalogLED(6), 
+  NULL, // LED 3 will be Multicolour LED 0
+  new AnalogLED(9), 
+  new AnalogLED(10), 
+  new AnalogLED(11), 
+  NULL, // LED 7 will be Multicolour LED 1
+  new DigitalLED(13)
+};
 
-Button* arrButtons[] = { new DigitalButton(2), 
-                         new DigitalButton(4), 
-                         new DigitalButton(7)
-                       };
+// array with multicolour LEDs
+MulticolourLED* arrMulticolourLEDs[] = {
+  new MulticolourLED(arrLEDs[0], arrLEDs[1], arrLEDs[2]), 
+  new MulticolourLED(arrLEDs[3], arrLEDs[4], arrLEDs[5])
+};
+
+// array with buttons
+Button* arrButtons[] = { 
+  new DigitalButton(2), 
+  new DigitalButton(4), 
+  new DigitalButton(7)
+};
 
 // LCD and text initialization
 Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
@@ -117,6 +131,9 @@ byte bigNumberChars[10][6] =  { { 0,  1,  2,   3,  4,  5 }, // 0
  */
 void setup()
 {
+  arrLEDs[3] = arrMulticolourLEDs[0]; // LED 3 is multicolour LED 0
+  arrLEDs[7] = arrMulticolourLEDs[1]; // LED 7 is multicolour LED 1
+  
   // initialise the LCD (if present)
   initializeLCD();
   
@@ -173,6 +190,7 @@ void serialEvent()
         case 'b': processGetButtonStateCommand(); break;
         case 'l': processGetLedBrightnessCommand(); break;
         case 'L': processSetLedBrightnessCommand(); break;
+        case 'M': processSetMulticolourLedColourCommand(); break;
         case 'T': processSetLcdTextCommand(); break;
         
         // ignore extraneous bytes
@@ -417,30 +435,77 @@ void processGetLedBrightnessCommand()
 
 /**
  * Sets the LED brightness (and optionally blink parameters).
- * La,b[,c[,d]] : a=LED number, b=brightness (0-99), c=blink interval in ms, d=blink ratio (0-99)
+ * Ln,b[,i[,r]] : n=LED number, b=brightness (0-99), i=blink interval in ms, r=blink ratio (0-99)
  */
 void processSetLedBrightnessCommand()
 {
   boolean success = false;
-  int ledIdx = readInt(); // LED index is first parameter
-  if ( hasNextParameter() && hasInt() )
+  // LED index is first parameter
+  int ledIdx = readInt(); 
+  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) && 
+       (arrLEDs[ledIdx] != NULL) &&
+       hasNextParameter() && hasInt() )
   {
-    int brightness = readInt(); // LED brightness is second parameter
-    if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) && (brightness >= 0) )
+    // LED brightness is second parameter
+    int brightness = readInt(); 
+    arrLEDs[ledIdx]->setBrightness(brightness);
+    
+    // optional blink interval in ms
+    if ( hasNextParameter() && hasInt() )
     {
-      arrLEDs[ledIdx]->setBrightness(brightness);
+      int interval = readInt();
+      arrLEDs[ledIdx]->setBlinkInterval(interval);
+    }
+    
+    // optional blink ratio in percent
+    if ( hasNextParameter() && hasInt() )
+    {
+      int ratio = readInt();
+      arrLEDs[ledIdx]->setBlinkRatio(ratio);
+    }
+
+    success = true;
+  }
+  Serial.println(success ? SUCCESS_CHAR : ERROR_CHAR);
+}
+
+
+
+/**
+ * Sets the colour (and optionally blink parameters) of a multicolour LED.
+ * Mn,r,g,b,[,i[,r]] : n=LED number, r,g,b=RGB brightness (0-99), i=blink interval in ms, r=blink ratio (0-99)
+ */
+void processSetMulticolourLedColourCommand()
+{
+  boolean success = false;
+  // LED index is first parameter
+  int ledIdx = readInt(); 
+  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrMulticolourLEDs)) && 
+       (arrMulticolourLEDs[ledIdx] != NULL) &&
+       hasNextParameter() && hasInt() )
+  {
+    // Red/Green/Blue brightness are the next three parameters
+    int red   = readInt(); hasNextParameter();
+    int green = readInt(); hasNextParameter();
+    int blue  = readInt(); 
+    if ( (red >= 0) && (green >=0) && (blue >= 0) )
+    {
+      arrMulticolourLEDs[ledIdx]->setColour(red, green, blue);
+      
+      // optional blink interval in ms
       if ( hasNextParameter() && hasInt() )
       {
-        // optional blink interval in ms
         int interval = readInt();
-        arrLEDs[ledIdx]->setBlinkInterval(interval);
+        arrMulticolourLEDs[ledIdx]->setBlinkInterval(interval);
       }
+      
+      // optional blink ratio in percent
       if ( hasNextParameter() && hasInt() )
       {
-        // optional blink ratio in percent
         int ratio = readInt();
-        arrLEDs[ledIdx]->setBlinkRatio(ratio);
+        arrMulticolourLEDs[ledIdx]->setBlinkRatio(ratio);
       }
+  
       success = true;
     }
   }

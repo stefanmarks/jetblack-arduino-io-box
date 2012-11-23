@@ -1,6 +1,7 @@
 
 using UnityEngine;
 using System;
+using System.IO;
 using System.IO.Ports;
 using System.Collections;
 
@@ -34,8 +35,16 @@ public class ArduinoIO_Module : MonoBehaviour
 		serialPort.ReadTimeout = 250;    // longer read timeout (module might have had a reset nevertheless)
 		
 		bool success = false;
-		serialPort.Open();
-		if ( serialPort.IsOpen )
+		try
+		{
+			serialPort.Open();
+		}
+		catch (IOException)
+		{
+			serialPort = null;
+		}
+		
+		if ( (serialPort != null) && serialPort.IsOpen )
 		{
 			int repeats = 8; // try several times to connect
 			while ( (repeats-- > 0) && !success )
@@ -71,8 +80,11 @@ public class ArduinoIO_Module : MonoBehaviour
 		if ( !success )
 		{
 			Debug.LogError("Could not open serial port " + modulePort + " to the Arduino IO module.");
-			serialPort.Close();
-			serialPort = null;
+			if ( serialPort != null )
+			{
+				serialPort.Close();
+				serialPort = null;
+			}
 		}
 	}
 	
