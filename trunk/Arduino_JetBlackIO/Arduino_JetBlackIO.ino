@@ -20,9 +20,10 @@
  * Ln,b[,i[,r]]    : Set LED n brightness to b (00-99) (and blink interval to i, and blink ratio to r)
  * ln              : Get brightness of LED n
  * Mn,r,g,b[,i[,r]]: Set multicolour LED n colour to r,g,b (00-99) (and blink interval to i, and blink ratio to r)
- * Tx,y,z "string" : Set text on LCD display, set to location row(x) and column(y) of where to start writing
- *                   turn screen on/off by sending 0 (on) or 1(off) as z. i.e. T101"hi" prints to row 1, column 0 with screen on                
- * 
+ * T"string"       : Set text on LCD display, the string to be displayed must be enclosed with quotation marks               
+ * Nx              : Displays large numerical text on the LCD where x is the number to be displayed
+ * Px,y            : Sets the row and column for the cursor. x is row, y is column
+ *
  * Return value: "+" or value if command successful, "!" if an error occured
  */
  
@@ -69,11 +70,6 @@ Button* arrButtons[] = {
 
 // LCD and text initialization
 Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
-char incomingString[25]; // Set some space for the string (25 characters)
-int  row = 0, column = 0; //default row and column locations set to 0
-uint8_t oldButtons;
-int cursorIterator = 0; // Iterator for large font locations
-boolean largeFont = true;
 
 // Predefined constants for LCD backlight color
 #define LCD_BLACK  0x0
@@ -147,8 +143,6 @@ void setup()
  */
 void loop() 
 {
-  processLCDButtons();
-  
   unsigned long time = millis();
   // update the LEDs
   for ( int i = 0 ; i < ARRSIZE(arrLEDs) ; i++ ) 
@@ -192,6 +186,8 @@ void serialEvent()
         case 'L': processSetLedBrightnessCommand(); break;
         case 'M': processSetMulticolourLedColourCommand(); break;
         case 'T': processSetLcdTextCommand(); break;
+        case 'P': processSetCursorCommand(); break;
+        case 'N': processSetBigNumberCommand(); break;
         
         // ignore extraneous bytes
         case CHAR_LF: break;
@@ -545,10 +541,70 @@ void initializeLCD()
   }
 }
 
+/**
+  * Sets the cursor to a defined position
+  * default positions are row - 0 and column - 0
+  * e.g. P1,2 shifts the cursor to row 1, column 2,
+  * any text printed afterwards will start from this location
+  */
+void processSetCursorCommand()
+{
+  int row = 0, column = 0;
+  if ( pLCD == NULL )
+  {
+    // no LCD connected -> get me out of here
+    Serial.println(ERROR_CHAR);
+    return;
+  } 
+  //read any integers passed through
+  row = readInt(); hasNextParameter();
+  column = readInt();
+  pLCD->setCursor(column, row); 
+  Serial.println(SUCCESS_CHAR);  
+}
+
+/**
+  * Sets received numbers to display in big font on the LCD screen
+  * e.g. N123 will print 123 in big font on the screen
+  */
+void processSetBigNumberCommand()
+{
+  int cursorIterator = 0; // Iterator for large font locations
+  while(charsAvailable() > 0)
+  {
+    int num = readChar() - '0';
+    if ( (num >=0) && (num <= 9) )
+    {
+      byte arrIter = 0; // iterator through character array
+      for ( byte y = 0 ; y < 2 ; y++ ) // two lines
+      {
+        pLCD->setCursor(cursorIterator, y);
+        for ( byte x = 0 ; x < 3 ; x++ ) // three chars each line
+        {
+          pLCD->write(bigNumberChars[num][arrIter++]);
+        }
+      }
+      cursorIterator += 4; // advance cursor 4 spaces
+    }
+  }
+   
+  //use cursor iterator to check if anything was printed 
+  if(cursorIterator > 0)
+  {
+    Serial.println(SUCCESS_CHAR);  
+    cursorIterator = 0; 
+  } 
+  else
+  {
+     //deemed unsuccessful if nothing was printed
+     Serial.println(ERROR_CHAR);
+  }
+  
+}
 
 /**
  * Sets the text to display on the LCD panel
- * T: followed by the text to display
+ * 'T' followed by the text to display within quotation marks "text"
  */
 void processSetLcdTextCommand()
 {  
@@ -559,122 +615,15 @@ void processSetLcdTextCommand()
     return;
   }
   
-  char nextChar = ' ';
-  column = 0, row = 0;
-  boolean rowDone = false, columnDone = false, backLightDone = false;
-  while(nextChar != '"' && charsAvailable() > 0)
-  {
-    nextChar = readChar();
-    //check if row hasn't already been set, if characters are left
-    //and if the found character is a number
-    if (!rowDone && nextChar >='0' && nextChar <='9')
+    String receivedString = readString();
+    if(receivedString.length() > 0)
     {
-      // sets the row Location on the LCD
-      row = nextChar - '0';
-      rowDone = true;
-    }
-    else if (!columnDone && nextChar >='0' && nextChar <='9')
-    {
-      // sets the column location on the LCD
-      column = nextChar - '0'; 
-      columnDone = true;
-    }
-    else if(!backLightDone && nextChar >= '0' && nextChar <= '1')
-    {
-      if(nextChar == '0')
-      {
-         pLCD->setBacklight(LCD_BLACK);
-      }
-      else
-      {
-         pLCD->setBacklight(LCD_WHITE); 
-      }
-      backLightDone = true;
-    } 
-  }
-  
-    pLCD->setCursor(column, row);
-    
-    //Now we check to see if any quotation marks are present
-    //only print strings that begin with a quotation    
-    if(nextChar == '"')
-    {
-      processText();
+      pLCD->print(receivedString); 
     }
  
   // all went well (?)
   Serial.println(SUCCESS_CHAR);  
 }
-
-
-/**
- * Function to process the text to be displayed
- */
-void processText()
-{
-  int index = 0;
-  char incomingChar = '.';
-  // While serial data is being received
-  while (charsAvailable() > 0)
-  {
-    //only accept the first 25 characters (size of the string array)
-    if(index < 24)
-    {
-      incomingChar = readChar();
-      if(incomingChar == '"')
-      {
-        break;
-      }
-      //Store the incoming character into the string
-      incomingString[index] = incomingChar;
-      //Increment to next index in string array
-      index++;
-      // Null terminate the string
-      incomingString[index] = '\0'; 
-    }
-  }
-  if (index  > 0) 
-  { 
-    pLCD->print(incomingString); 
-    for(int i = 0; i < index; i++)
-    {      
-      if(incomingString[i] == CHAR_CR)
-      {
-        //pLCD->setCursor(column , row++);
-      }
-      if(incomingString[i] == '\0')
-      {
-        break;
-      }
-      
-      if(largeFont)
-      {
-        int num = incomingString[i] - '0';
-        if ( (num >=0) && (num <= 9) )
-        {
-          byte arrIter = 0; // iterator through character array
-          for ( byte y = 0 ; y < 2 ; y++ ) // two lines
-          {
-            pLCD->setCursor(cursorIterator, y);
-            for ( byte x = 0 ; x < 3 ; x++ ) // three chars each line
-            {
-              pLCD->write(bigNumberChars[num][arrIter++]);
-            }
-          }
-          cursorIterator += 4; // advance cursor 4 spaces
-        }
-      }
-      else
-      {
-         pLCD->setCursor(column + i , row);
-         pLCD->print(incomingString[i]);  
-      }
-      incomingString[i] = '\0';
-    } 
-   cursorIterator = 0;   
-  } 
-}
-
 
 /**
  * Checks the LCD's default i2c to see if it is connected
@@ -692,33 +641,5 @@ boolean checkLcdConnection()
     found = true;
   }
   return found;
-}
-
-/**
- * Checks if any buttons were pressed during each update and reacts accordingly
- *                               --Current Button Configurations--
- * Select Button - Switches size of fonts
- */
-void processLCDButtons()
-{
-  uint8_t newButtons = pLCD->readButtons();
-  uint8_t buttons = newButtons & ~oldButtons;
-  oldButtons = newButtons;
-  if (buttons) 
-  {
-    if (buttons & BUTTON_SELECT) 
-    {
-      if(largeFont)
-      {
-        //Serial.println("Large font off");
-        largeFont = false;
-      }
-      else
-      {
-        //Serial.println("Large font on");
-        largeFont = true;
-      }
-    }
-  } 
 }
 
