@@ -66,6 +66,23 @@ class LED
      */
     virtual void setBlinkRatio(byte ratio);
 
+	/**
+	 * Checks if the LED supports multiple colours.
+	 *
+	 * @return <code>true</code> if the LED supports multiple colours,
+	 *         <code>false</code> if not
+	 */
+	virtual bool supportsColour();
+	
+	/**
+     * Sets the colour of the LED.
+     *
+     * @param red   the red   colour component (0-99)
+     * @param green the green colour component (0-99)
+     * @param blue  the blue  colour component (0-99)
+     */
+    virtual void setColour(byte red, byte green, byte blue);
+	
     /**
      * This method needs to be called inside the main loop with the current millis() result
      * to allow for time-controlled events and control to function properly.

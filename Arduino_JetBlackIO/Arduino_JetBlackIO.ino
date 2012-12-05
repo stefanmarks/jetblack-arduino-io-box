@@ -33,7 +33,7 @@
 #include "DigitalButton.h"
 #include "DigitalLED.h"
 #include "AnalogLED.h"
-#include "MulticolourLED.h"
+#include "RGB_LED.h"
 #include "Adafruit_MCP23017.h"
 #include "Adafruit_RGBLCDShield.h"
 
@@ -55,21 +55,7 @@ LED* arrLEDs[] = {
   new AnalogLED(11), 
   NULL, // LED 7 will be Multicolour LED 1
   new DigitalLED(13), // LED on the board
-  NULL 
-};
-
-// array with multicolour LEDs
-MulticolourLED* arrMulticolourLEDs[] = {
-  NULL,
-  NULL,
-  NULL,
-  new MulticolourLED(arrLEDs[0], arrLEDs[1], arrLEDs[2]), 
-  NULL,
-  NULL,
-  NULL,
-  new MulticolourLED(arrLEDs[4], arrLEDs[5], arrLEDs[6]),
-  NULL,
-  NULL
+  NULL  // LED 9 will be the LCD background LED
 };
 
 // array with buttons
@@ -138,8 +124,8 @@ byte bigNumberChars[10][6] =  { { 0,  1,  2,   3,  4,  5 }, // 0
  */
 void setup()
 {
-  arrLEDs[3] = arrMulticolourLEDs[3]; // LED 3 is a multicolour LED
-  arrLEDs[7] = arrMulticolourLEDs[7]; // LED 7 is a multicolour LED
+  arrLEDs[3] = new RGB_LED(arrLEDs[0], arrLEDs[1], arrLEDs[2]); // LED 3 is a multicolour LED
+  arrLEDs[7] = new RGB_LED(arrLEDs[4], arrLEDs[5], arrLEDs[6]); // LED 7 is a multicolour LED
   
   // initialise the LCD (if present)
   initializeLCD();
@@ -455,22 +441,24 @@ void processSetLedBrightnessCommand()
        (arrLEDs[ledIdx] != NULL) &&
        hasNextParameter() && hasInt() )
   {
+    LED* pLed = arrLEDs[ledIdx];
+    
     // LED brightness is second parameter
     int brightness = readInt(); 
-    arrLEDs[ledIdx]->setBrightness(brightness);
+    pLed->setBrightness(brightness);
     
     // optional blink interval in ms
     if ( hasNextParameter() && hasInt() )
     {
       int interval = readInt();
-      arrLEDs[ledIdx]->setBlinkInterval(interval);
+      pLed->setBlinkInterval(interval);
     }
     
     // optional blink ratio in percent
     if ( hasNextParameter() && hasInt() )
     {
       int ratio = readInt();
-      arrLEDs[ledIdx]->setBlinkRatio(ratio);
+      pLed->setBlinkRatio(ratio);
     }
 
     success = true;
@@ -489,30 +477,31 @@ void processSetMulticolourLedColourCommand()
   boolean success = false;
   // LED index is first parameter
   int ledIdx = readInt(); 
-  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrMulticolourLEDs)) && 
-       (arrMulticolourLEDs[ledIdx] != NULL) &&
+  if ( (ledIdx >= 0) && (ledIdx < ARRSIZE(arrLEDs)) && 
+       (arrLEDs[ledIdx] != NULL) && arrLEDs[ledIdx]->supportsColour() &&
        hasNextParameter() && hasInt() )
   {
+    LED* pLed = arrLEDs[ledIdx];
     // Red/Green/Blue brightness are the next three parameters
     int red   = readInt(); hasNextParameter();
     int green = readInt(); hasNextParameter();
     int blue  = readInt(); 
     if ( (red >= 0) && (green >=0) && (blue >= 0) )
     {
-      arrMulticolourLEDs[ledIdx]->setColour(red, green, blue);
+      pLed->setColour(red, green, blue);
       
       // optional blink interval in ms
       if ( hasNextParameter() && hasInt() )
       {
         int interval = readInt();
-        arrMulticolourLEDs[ledIdx]->setBlinkInterval(interval);
+        pLed->setBlinkInterval(interval);
       }
       
       // optional blink ratio in percent
       if ( hasNextParameter() && hasInt() )
       {
         int ratio = readInt();
-        arrMulticolourLEDs[ledIdx]->setBlinkRatio(ratio);
+        pLed->setBlinkRatio(ratio);
       }
   
       success = true;

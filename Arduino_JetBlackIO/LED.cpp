@@ -74,6 +74,18 @@ void LED::setBlinkRatio(byte ratio)
 }
 
 
+bool LED::supportsColour()
+{
+  return false; // default case: unicolour
+}
+
+
+void LED::setColour(byte /*red*/, byte /*green*/, byte /*blue*/)
+{
+  // do nothing here
+}
+
+
 void LED::update(unsigned long time)
 {
   if ( interval > 0 )
