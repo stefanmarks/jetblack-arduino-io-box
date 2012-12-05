@@ -13,6 +13,8 @@
  * @version 1.4 - 2012.11.23: - Added button command
  *                            - Refactored big numbers code
  *                            - Added multicolour LEDs
+ * @version 1.5 - 2012.12.05: - Bugfixes in the receive routine and the multicolour LEDs
+ *                            - Cursor position column parameter optional
  *
  * Command set:
  * E               : Echo version number
@@ -37,7 +39,7 @@
 
 // version of the IO box
 const char MODULE_NAME[]    = "JetBlack IO-Box";
-const char MODULE_VERSION[] = "v1.4";
+const char MODULE_VERSION[] = "v1.5";
 
 // macro for the size of an array
 #define ARRSIZE(x) (sizeof(x) / sizeof(x[0] ))
@@ -52,7 +54,7 @@ LED* arrLEDs[] = {
   new AnalogLED(10), 
   new AnalogLED(11), 
   NULL, // LED 7 will be Multicolour LED 1
-  new DigitalLED(13) // LED on the board
+  new DigitalLED(13), // LED on the board
   NULL 
 };
 
@@ -65,7 +67,7 @@ MulticolourLED* arrMulticolourLEDs[] = {
   NULL,
   NULL,
   NULL,
-  new MulticolourLED(arrLEDs[4], arrLEDs[5], arrLEDs[6])
+  new MulticolourLED(arrLEDs[4], arrLEDs[5], arrLEDs[6]),
   NULL,
   NULL
 };
@@ -649,14 +651,9 @@ void processSetLcdTextCommand()
  */
 boolean checkLcdConnection()
 {
-  boolean found = false;
-  
   Wire.begin();
   Wire.beginTransmission(32);
-  if ( Wire.endTransmission() == 0 )
-  {
-    found = true;
-  }
+  boolean found = (Wire.endTransmission() == 0);
   return found;
 }
 
