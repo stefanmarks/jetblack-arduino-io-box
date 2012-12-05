@@ -8,7 +8,7 @@
 #ifndef RGB_LED_H_INCLUDED
 #define RGB_LED_H_INCLUDED
 
-#include "ColourLED.h"
+#include "LED.h"
 
 class RGB_LED : public LED
 {
@@ -23,13 +23,13 @@ class RGB_LED : public LED
      */
     RGB_LED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue);
 
-	/**
-	 * Checks if the LED supports multiple colours.
-	 *
-	 * @return <code>true</code> if the LED supports multiple colours,
-	 *         <code>false</code> if not
-	 */
-	virtual bool supportsColour();
+    /**
+     * Checks if the LED supports multiple colours.
+     *
+     * @return <code>true</code> if the LED supports multiple colours,
+     *         <code>false</code> if not
+     */
+      virtual bool supportsColour();
 	
     /**
      * Sets the colour of the LED.
