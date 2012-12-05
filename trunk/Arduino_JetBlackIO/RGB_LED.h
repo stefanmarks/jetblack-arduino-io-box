@@ -1,16 +1,16 @@
 /**
- * Class for multicolour LEDs connected to analog pins of the board.
+ * Class for RGB LEDs connected to analog pins of the board.
  * 
- * @version 1.0 - 2012.11.22: Created
+ * @version 1.0 - 2012.12.05: Created
  * @author  Stefan Marks
  */
  
-#ifndef MULTICOLOUR_LED_H_INCLUDED
-#define MULTICOLOUR_LED_H_INCLUDED
+#ifndef RGB_LED_H_INCLUDED
+#define RGB_LED_H_INCLUDED
 
-#include "LED.h"
+#include "ColourLED.h"
 
-class MulticolourLED : public LED
+class RGB_LED : public LED
 {
   public:
 
@@ -19,10 +19,18 @@ class MulticolourLED : public LED
      *
      * @param pLEDred   the LED object that is controlling the red component
      * @param pLEDgreen the LED object that is controlling the green component
-     * @param pLEDblue  the LED object that is controlling the green component
+     * @param pLEDblue  the LED object that is controlling the blue component
      */
-    MulticolourLED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue);
+    RGB_LED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue);
 
+	/**
+	 * Checks if the LED supports multiple colours.
+	 *
+	 * @return <code>true</code> if the LED supports multiple colours,
+	 *         <code>false</code> if not
+	 */
+	virtual bool supportsColour();
+	
     /**
      * Sets the colour of the LED.
      *
@@ -30,7 +38,7 @@ class MulticolourLED : public LED
      * @param green the green colour component (0-99)
      * @param blue  the blue  colour component (0-99)
      */
-    void setColour(byte red, byte green, byte blue);
+    virtual void setColour(byte red, byte green, byte blue);
 
     /**
      * Sets the LED blink interval.
@@ -61,5 +69,5 @@ class MulticolourLED : public LED
 };
 
 
-#endif // MULTICOLOUR_LED_H_INCLUDED
+#endif // RGB_LED_H_INCLUDED
 

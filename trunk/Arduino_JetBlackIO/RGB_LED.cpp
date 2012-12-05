@@ -1,13 +1,13 @@
 /**
- * Multicolour LED class implementation.
+ * RGB LED class implementation.
  *
  * @version 1.0 - 2012.11.23: Created
  * @author  Stefan Marks
  */
  
-#include "MulticolourLED.h"
+#include "RGB_LED.h"
 
-MulticolourLED::MulticolourLED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue) : LED()
+RGB_LED::RGB_LED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue) : LED()
 {
   this->pLEDred   = pLEDred;
   this->pLEDgreen = pLEDgreen;
@@ -21,7 +21,13 @@ MulticolourLED::MulticolourLED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue) : LE
 }
 
 
-void MulticolourLED::setColour(byte red, byte green, byte blue)
+bool RGB_LED::supportsColour()
+{
+  return true;
+}
+
+
+void RGB_LED::setColour(byte red, byte green, byte blue)
 {
   this->red   = constrain(red,   0, 99);
   this->green = constrain(green, 0, 99);
@@ -30,7 +36,7 @@ void MulticolourLED::setColour(byte red, byte green, byte blue)
 }
 
 
-void MulticolourLED::setBlinkInterval(unsigned int interval)
+void RGB_LED::setBlinkInterval(unsigned int interval)
 {
   // set all components synchronously
   if ( pLEDred   != NULL ) pLEDred->setBlinkInterval(interval);
@@ -40,7 +46,7 @@ void MulticolourLED::setBlinkInterval(unsigned int interval)
 }
 
 
-void MulticolourLED::setBlinkRatio(byte ratio)
+void RGB_LED::setBlinkRatio(byte ratio)
 {
   // set all components synchronously
   if ( pLEDred   != NULL ) pLEDred->setBlinkRatio(ratio);
@@ -50,13 +56,13 @@ void MulticolourLED::setBlinkRatio(byte ratio)
 }
 
 
-void MulticolourLED::update(unsigned long /* time */)
+void RGB_LED::update(unsigned long /* time */)
 {
   // do nothing here, LED's are updated by themselves
 }
 
 
-void MulticolourLED::updateLedState()
+void RGB_LED::updateLedState()
 {
   if ( pLEDred   != NULL ) pLEDred->setBrightness(  (int) red   * brightness / 99);
   if ( pLEDgreen != NULL ) pLEDgreen->setBrightness((int) green * brightness / 99);
