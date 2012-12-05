@@ -22,7 +22,7 @@
  * Mn,r,g,b[,i[,r]]: Set multicolour LED n colour to r,g,b (00-99) (and blink interval to i, and blink ratio to r)
  * T"string"       : Set text on LCD display, the string to be displayed must be enclosed with quotation marks               
  * Nx              : Displays large numerical text on the LCD where x is the number to be displayed
- * Px,y            : Sets the row and column for the cursor. x is row, y is column
+ * Pr[,c]          : Sets the row r [and column c] for the cursor
  *
  * Return value: "+" or value if command successful, "!" if an error occured
  */
@@ -52,13 +52,22 @@ LED* arrLEDs[] = {
   new AnalogLED(10), 
   new AnalogLED(11), 
   NULL, // LED 7 will be Multicolour LED 1
-  new DigitalLED(13)
+  new DigitalLED(13) // LED on the board
+  NULL 
 };
 
 // array with multicolour LEDs
 MulticolourLED* arrMulticolourLEDs[] = {
+  NULL,
+  NULL,
+  NULL,
   new MulticolourLED(arrLEDs[0], arrLEDs[1], arrLEDs[2]), 
-  new MulticolourLED(arrLEDs[3], arrLEDs[4], arrLEDs[5])
+  NULL,
+  NULL,
+  NULL,
+  new MulticolourLED(arrLEDs[4], arrLEDs[5], arrLEDs[6])
+  NULL,
+  NULL
 };
 
 // array with buttons
@@ -127,8 +136,8 @@ byte bigNumberChars[10][6] =  { { 0,  1,  2,   3,  4,  5 }, // 0
  */
 void setup()
 {
-  arrLEDs[3] = arrMulticolourLEDs[0]; // LED 3 is multicolour LED 0
-  arrLEDs[7] = arrMulticolourLEDs[1]; // LED 7 is multicolour LED 1
+  arrLEDs[3] = arrMulticolourLEDs[3]; // LED 3 is a multicolour LED
+  arrLEDs[7] = arrMulticolourLEDs[7]; // LED 7 is a multicolour LED
   
   // initialise the LCD (if present)
   initializeLCD();
@@ -177,7 +186,8 @@ void serialEvent()
     if ( (rxIn == CHAR_LF) || (rxIn == CHAR_CR) )     
     {
       // look at what the received command is
-      switch ( readChar() )
+      char cmd = readChar();
+      switch ( cmd )
       {
         // proper commands
         case 'E': processEchoCommand(); break;
@@ -192,9 +202,10 @@ void serialEvent()
         // ignore extraneous bytes
         case CHAR_LF: break;
         case CHAR_CR: break;
+        case '\0'   : break;
         
         // everything else is wrong
-        default : Serial.println(ERROR_CHAR); break;
+        default : Serial.println('?'); break;
       }
       // prepare for next command: reset read buffer
       rxBufferIdx = 0;
@@ -541,32 +552,38 @@ void initializeLCD()
   }
 }
 
+
 /**
-  * Sets the cursor to a defined position
-  * default positions are row - 0 and column - 0
-  * e.g. P1,2 shifts the cursor to row 1, column 2,
-  * any text printed afterwards will start from this location
-  */
+ * Sets the cursor to a defined position
+ * default positions are row - 0 and column - 0
+ * e.g. P1,2 shifts the cursor to row 1, column 2,
+ * any text printed afterwards will start from this location
+ */
 void processSetCursorCommand()
 {
-  int row = 0, column = 0;
   if ( pLCD == NULL )
   {
     // no LCD connected -> get me out of here
     Serial.println(ERROR_CHAR);
     return;
   } 
+  
   //read any integers passed through
-  row = readInt(); hasNextParameter();
-  column = readInt();
+  int row    = readInt(); 
+  int column = 0;
+  if ( hasNextParameter() ) // column is optional
+  {
+     column = readInt();
+  }
   pLCD->setCursor(column, row); 
-  Serial.println(SUCCESS_CHAR);  
+  Serial.println(SUCCESS_CHAR);
 }
 
+
 /**
-  * Sets received numbers to display in big font on the LCD screen
-  * e.g. N123 will print 123 in big font on the screen
-  */
+ * Sets received numbers to display in big font on the LCD screen
+ * e.g. N123 will print 123 in big font on the screen
+ */
 void processSetBigNumberCommand()
 {
   int cursorIterator = 0; // Iterator for large font locations
@@ -589,7 +606,7 @@ void processSetBigNumberCommand()
   }
    
   //use cursor iterator to check if anything was printed 
-  if(cursorIterator > 0)
+  if ( cursorIterator > 0 )
   {
     Serial.println(SUCCESS_CHAR);  
     cursorIterator = 0; 
@@ -601,6 +618,7 @@ void processSetBigNumberCommand()
   }
   
 }
+
 
 /**
  * Sets the text to display on the LCD panel
@@ -615,15 +633,14 @@ void processSetLcdTextCommand()
     return;
   }
   
-    String receivedString = readString();
-    if(receivedString.length() > 0)
-    {
-      pLCD->print(receivedString); 
-    }
- 
-  // all went well (?)
-  Serial.println(SUCCESS_CHAR);  
+  String receivedString = readString();
+  if ( receivedString.length() > 0 )
+  {
+    pLCD->print(receivedString); 
+  }
+  Serial.println(SUCCESS_CHAR); 
 }
+
 
 /**
  * Checks the LCD's default i2c to see if it is connected
