@@ -1,24 +1,25 @@
 /**
  * Digital button class implementation.
  *
- * @version 1.0 - 2012.11.22: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.22: Created
+ * @version 1.1 - 2012.12.06: Modified to new button interface 
  */
  
 #include "DigitalButton.h"
 
+const unsigned long DEBOUNCE_TIME = 100; // time in ms to avoid bouncing contacts
+
 DigitalButton::DigitalButton(byte pinNo) : Button()
 {
-  this->pinNo = pinNo;
-  state    = false;
-  oldState = false;
-  changed  = false;
+  this->pinNo  = pinNo;
+  state        = false;
+  oldState     = false;
+  numPresses   = 0;
+  nextPollTime = 0;
   
   // prepare pin to output signal
   pinMode(pinNo, INPUT); 
-
-  update(0); 
-  changed = false;
 }
 
 
@@ -28,21 +29,28 @@ boolean DigitalButton::isPressed()
 }
 
     
-boolean DigitalButton::hasChanged()
+int DigitalButton::getNumPresses()
 {
-  boolean retChanged = changed;
-  changed = false;
-  return retChanged;
+  byte retPresses = numPresses;
+  numPresses = 0; // reset counter
+  return retPresses;
 }
 
     
-void DigitalButton::update(unsigned long /* time */)
+void DigitalButton::update(unsigned long time)
 {
-  oldState = state;
-  state    = (digitalRead(pinNo) == HIGH);
-  if ( state != oldState )
+  if ( time > nextPollTime ) // avoid bouncing contacts
   {
-    changed = true;
+    state = (digitalRead(pinNo) == HIGH);
+    if ( state != oldState ) 
+    {
+      if ( state )
+      {
+        numPresses++;
+      }
+      nextPollTime = time + DEBOUNCE_TIME;
+      oldState = state;
+    }
   }
 }
 

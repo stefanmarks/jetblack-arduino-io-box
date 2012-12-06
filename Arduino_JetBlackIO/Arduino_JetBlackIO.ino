@@ -15,10 +15,14 @@
  *                            - Added multicolour LEDs
  * @version 1.5 - 2012.12.05: - Bugfixes in the receive routine and the multicolour LEDs
  *                            - Cursor position column parameter optional
+ * @version 1.6 - 2012.12.06: - Added LCD Backlight as colour LED
+ *                            - Modified button command
+ *                            - Added clear command
  *
  * Command set:
+ * C               : Clear LCD
  * E               : Echo version number
- * ba              : Get state of button a (00:off, no change / 10: on, no change / 01:off, changed / 11:on, changed)
+ * ba              : Get state of button a (00:off, no change / 1x: on, x=number of presses sincel last poll)
  * Ln,b[,i[,r]]    : Set LED n brightness to b (00-99) (and blink interval to i, and blink ratio to r)
  * ln              : Get brightness of LED n
  * Mn,r,g,b[,i[,r]]: Set multicolour LED n colour to r,g,b (00-99) (and blink interval to i, and blink ratio to r)
@@ -34,12 +38,13 @@
 #include "DigitalLED.h"
 #include "AnalogLED.h"
 #include "RGB_LED.h"
+#include "LCD_Backlight.h"
 #include "Adafruit_MCP23017.h"
 #include "Adafruit_RGBLCDShield.h"
 
 // version of the IO box
 const char MODULE_NAME[]    = "JetBlack IO-Box";
-const char MODULE_VERSION[] = "v1.5";
+const char MODULE_VERSION[] = "v1.6";
 
 // macro for the size of an array
 #define ARRSIZE(x) (sizeof(x) / sizeof(x[0] ))
@@ -67,17 +72,6 @@ Button* arrButtons[] = {
 
 // LCD and text initialization
 Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
-
-// Predefined constants for LCD backlight color
-#define LCD_BLACK  0x0
-#define LCD_RED    0x1
-#define LCD_YELLOW 0x3
-#define LCD_GREEN  0x2
-#define LCD_TEAL   0x6
-#define LCD_BLUE   0x4
-#define LCD_VIOLET 0x5
-#define LCD_WHITE  0x7
-
 
 // constants for communication
 const char SUCCESS_CHAR = '+';
@@ -183,6 +177,7 @@ void serialEvent()
         case 'l': processGetLedBrightnessCommand(); break;
         case 'L': processSetLedBrightnessCommand(); break;
         case 'M': processSetMulticolourLedColourCommand(); break;
+        case 'C': processClearLcdCommand(); break;
         case 'T': processSetLcdTextCommand(); break;
         case 'P': processSetCursorCommand(); break;
         case 'N': processSetBigNumberCommand(); break;
@@ -398,8 +393,8 @@ void processGetButtonStateCommand()
   {
     // return button state (0,1)
     Serial.print(arrButtons[buttonIdx]->isPressed() ? '1' : '0');
-    // return button change flag (0,1)
-    Serial.println(arrButtons[buttonIdx]->hasChanged() ? '1' : '0');
+    // return number of presses
+    Serial.println(arrButtons[buttonIdx]->getNumPresses());
   }
   else
   {
@@ -467,7 +462,6 @@ void processSetLedBrightnessCommand()
 }
 
 
-
 /**
  * Sets the colour (and optionally blink parameters) of a multicolour LED.
  * Mn,r,g,b,[,i[,r]] : n=LED number, r,g,b=RGB brightness (0-99), i=blink interval in ms, r=blink ratio (0-99)
@@ -532,8 +526,13 @@ void initializeLCD()
     pLCD->setCursor(0,1);
     // print version number
     pLCD->print(MODULE_VERSION);
+
+    // create the backlight LED
+    LED* pBacklight = new LCD_Backlight(pLCD);
+    arrLEDs[9] = pBacklight;
     // set the backlight to white
-    pLCD->setBacklight(LCD_WHITE); 
+    pBacklight->setColour(99, 99, 99);
+    pBacklight->setBrightness(99);
   
     // define custom segments for big numbers
     for ( int i = 0 ; i < ARRSIZE(bigNumberSegments) ; i++ )
@@ -612,6 +611,23 @@ void processSetBigNumberCommand()
 
 
 /**
+ * Clears the text on the LCD panel.
+ */
+void processClearLcdCommand()
+{  
+  if ( pLCD == NULL )
+  {
+    // no LCD connected -> get me out of here
+    Serial.println(ERROR_CHAR);
+    return;
+  }
+  
+  pLCD->clear(); 
+  Serial.println(SUCCESS_CHAR); 
+}
+
+
+/**
  * Sets the text to display on the LCD panel
  * 'T' followed by the text to display within quotation marks "text"
  */
@@ -625,11 +641,11 @@ void processSetLcdTextCommand()
   }
   
   String receivedString = readString();
+  Serial.println(SUCCESS_CHAR); // send success char very quickly (TODO: Buffer LCD text)
   if ( receivedString.length() > 0 )
   {
     pLCD->print(receivedString); 
   }
-  Serial.println(SUCCESS_CHAR); 
 }
 
 

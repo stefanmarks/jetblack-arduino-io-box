@@ -1,8 +1,8 @@
 /**
- * Class file for LED control.
+ * Abstract base class declaration for LEDs.
  * 
- * @version 1.0 - 2012.11.14: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.14: Created
  */
  
 #ifndef LED_H_INCLUDED

@@ -1,10 +1,10 @@
 /**
- * Class for LEDs connected to purely digital pins of the board.
+ * Class declaration for LEDs connected to purely digital pins of the board.
  * Digitally driven LEDs cannot be set to intermediate brightnesses.
  * A brightness value >= 50 is interpreted as "on", otherwise as "off".
  * 
- * @version 1.0 - 2012.11.22: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.22: Created
  */
  
 #ifndef DIGITAL_LED_H_INCLUDED

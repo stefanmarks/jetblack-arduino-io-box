@@ -1,8 +1,8 @@
 /**
  * Button base class implementation.
  *
- * @version 1.0 - 2012.11.22: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.22: Created
  */
  
 #include "Button.h"

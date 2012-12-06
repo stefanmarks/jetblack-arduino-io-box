@@ -1,8 +1,9 @@
 /**
- * Class file for digital buttons directly connected to the Arduino chip.
+ * Class declaration for digital buttons directly connected to the Arduino chip.
  * 
- * @version 1.0 - 2012.11.22: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.22: Created
+ * @version 1.1 - 2012.12.06: Modified to new button interface
  */
  
 #ifndef DIGITAL_BUTTON_H_INCLUDED
@@ -23,14 +24,15 @@ class DigitalButton : public Button
     
     virtual boolean isPressed();
     
-    virtual boolean hasChanged();
+    virtual int getNumPresses();
     
     virtual void update(unsigned long time);
 
   private:
   
-    byte    pinNo;
-    boolean state, oldState, changed;
+    byte          pinNo, numPresses;
+    boolean       state, oldState;
+    unsigned long nextPollTime;
 };
 
 #endif // DIGITAL_BUTTON_H_INCLUDED
