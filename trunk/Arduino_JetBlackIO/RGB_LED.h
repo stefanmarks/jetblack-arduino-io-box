@@ -1,8 +1,8 @@
 /**
- * Class for RGB LEDs connected to analog pins of the board.
+ * Class declaration for RGB LEDs connected to analog pins of the board.
  * 
- * @version 1.0 - 2012.12.05: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.12.05: Created
  */
  
 #ifndef RGB_LED_H_INCLUDED
@@ -23,35 +23,14 @@ class RGB_LED : public LED
      */
     RGB_LED(LED* pLEDred, LED* pLEDgreen, LED* pLEDblue);
 
-    /**
-     * Checks if the LED supports multiple colours.
-     *
-     * @return <code>true</code> if the LED supports multiple colours,
-     *         <code>false</code> if not
-     */
-      virtual bool supportsColour();
+  // overridden methods
+  
+    virtual bool supportsColour();
 	
-    /**
-     * Sets the colour of the LED.
-     *
-     * @param red   the red   colour component (0-99)
-     * @param green the green colour component (0-99)
-     * @param blue  the blue  colour component (0-99)
-     */
     virtual void setColour(byte red, byte green, byte blue);
 
-    /**
-     * Sets the LED blink interval.
-     * 
-     * @param interval blink interval in milliseconds (0: no blinking)
-     */
     virtual void setBlinkInterval(unsigned int interval);
     
-    /**
-     * Sets the LED blink ratio.
-     * 
-     * @param ratio on/off blink ratio in percent
-     */
     virtual void setBlinkRatio(byte ratio);
     
     virtual void update(unsigned long time);

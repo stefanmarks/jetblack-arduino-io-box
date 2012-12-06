@@ -1,8 +1,8 @@
 /**
- * Class for LEDs connected to analog pins of the board.
+ * Class declaration for LEDs connected to analog pins of the board.
  * 
- * @version 1.0 - 2012.11.22: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.22: Created
  */
  
 #ifndef ANALOG_LED_H_INCLUDED

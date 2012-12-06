@@ -1,8 +1,8 @@
 /**
  * LED base class implementation.
  *
- * @version 1.0 - 2012.11.14: Created
  * @author  Stefan Marks
+ * @version 1.0 - 2012.11.14: Created
  */
  
 #include "LED.h"
