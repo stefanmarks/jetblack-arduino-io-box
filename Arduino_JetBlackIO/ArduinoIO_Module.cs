@@ -107,7 +107,6 @@ public class ArduinoIO_Module : MonoBehaviour
 		
 		setLedColour(ledLCD, Color.yellow); setLed (ledLCD, 255, 0, 0);
 		setText(0, "System Check:   ");
-		yield return new WaitForSeconds(0.1f); // TODO: remove when IO setText works better
 		setText(1, "                ");	
 		yield return new WaitForSeconds(stepWait);
 		
@@ -142,7 +141,6 @@ public class ArduinoIO_Module : MonoBehaviour
 		setLedColour(ledLeft, Color.white); setLedColour(ledRight, Color.white);
 		setLedColour(9, Color.green);
 		setText(0, " All Systems OK ");
-		yield return new WaitForSeconds(0.1f); // TODO: remove when IO setText works better
 		setText(1, " Ready to go... ");	
 
 		yield return new WaitForSeconds(stepWait);
@@ -260,7 +258,7 @@ public class ArduinoIO_Module : MonoBehaviour
 			// if vehicle starts to move: switch to speed page automatically
 			if ( (vehicleData.speed > 0.1) && (hudPage == HudPage.STANDBY) )
 			{
-				newPage = HudPage.SPEED_KMH;
+				newPage = HudPage.SPEED;
 			}
 			
 			if ( newPage != hudPage )
@@ -281,50 +279,7 @@ public class ArduinoIO_Module : MonoBehaviour
 		}
 	}
 	
-	/// <summary>
-	/// Updates the data on the HUD.
-	/// </summary>
-	/// 
-	private void updateHud()
-	{
-		if ( IsConnected() && (Time.time > nextHudUpdateTime) )
-		{
-			switch ( hudPage )
-			{
-				case HudPage.SPEED_KMH:
-				{
-					double speedKmH = vehicleData.speed * 3.6;
-					String speed = speedKmH.ToString("0000");
-					setText(0, 7, speed);
-					break;
-				}
-				case HudPage.SPEED_MACH:
-				{
-					double speedMach = vehicleData.speed / speedOfSound;
-					String speed = speedMach.ToString("0.00");
-					setText(0, 7, speed);
-					break;
-				}
-				case HudPage.FUEL1:
-				{
-				    double fuelPercent = vehicleData.engine1FuelLevel * 100.0;
-					String fuel = fuelPercent.ToString("000");
-					setText(0, 9, fuel);
-					break;
-				}
-				case HudPage.FUEL2:
-				{
-				    double fuelPercent = vehicleData.engine2FuelLevel * 100.0;
-					String fuel = fuelPercent.ToString("000");
-					setText(0, 9, fuel);
-					break;
-				}
-			}
-			nextHudUpdateTime = Time.time + (hudUpdateInterval / 1000.0);
-		}			
-	}
-	
-	
+
 	/// <summary>
 	/// Changes the current HUD page.
 	/// </summary>
@@ -339,32 +294,28 @@ public class ArduinoIO_Module : MonoBehaviour
 			clearText();
 			switch ( page )
 			{
-				case HudPage.SPEED_KMH:
+				case HudPage.SPEED:
 				{
 					setLedColour(ledLCD, Color.white); 
 					setLed(ledLCD, 99, 0, 0);
 					setText(0, "Speed: 0000 km/h");
+					setText(1, "       0.00 mach");
 					break;
 				}
-				case HudPage.SPEED_MACH:
+				case HudPage.THRUST:
 				{
 					setLedColour(ledLCD, Color.white); 
 					setLed(ledLCD, 99, 0, 0);
-					setText(0, "Speed: 0.00 mach");
+					setText(0, "Thrust E1: 000%");
+					setText(1, "       E2: 000%");
 					break;
 				}
-				case HudPage.FUEL1:
+				case HudPage.FUEL:
 				{
 					setLedColour(ledLCD, Color.white); 
 					setLed(ledLCD, 99, 0, 0);
 					setText(0, "Fuel E1: 000%");
-					break;
-				}
-				case HudPage.FUEL2:
-				{
-					setLedColour(ledLCD, Color.white); 
-					setLed(ledLCD, 99, 0, 0);
-					setText(0, "Fuel E2: 000%");
+					setText(1, "     E2: 000%");
 					break;
 				}
 				case HudPage.ABORT:
@@ -374,18 +325,72 @@ public class ArduinoIO_Module : MonoBehaviour
 					setLed (9, 99, 500, 50);
 					// write text
 					setText(0, "!!!! ABORT !!!! ");
+					setText(1, "!!!! ABORT !!!! ");
 					break;
 				}
 			}
 			hudPage = page;
 			
-			// TODO:
-			// don't immediately update the data
-			// ...this has to go at some point...
-			nextHudUpdateTime  = Time.time + 0.25;
+			// immediately update the data
+			nextHudUpdateTime  = Time.time;
 			nextButtonPollTime = nextHudUpdateTime;
 		}
 	}
+	
+	
+	/// <summary>
+	/// Updates the data on the HUD.
+	/// </summary>
+	/// 
+	private void updateHud()
+	{
+		if ( IsConnected() && (Time.time > nextHudUpdateTime) )
+		{
+			switch ( hudPage )
+			{
+				case HudPage.SPEED:
+				{
+					double speedKmH = vehicleData.speed * 3.6;
+					String speed = speedKmH.ToString("0000");
+					setText(0, 7, speed);
+					double speedMach = vehicleData.speed / speedOfSound;
+					speed = speedMach.ToString("0.00");
+					setText(1, 7, speed);
+					break;
+				}
+				case HudPage.THRUST:
+				{
+					double thrustPercent = vehicleData.engine1Thrust * 100.0;
+					String thrust = thrustPercent.ToString("000");
+					setText(0, 11, thrust);
+				    thrustPercent = vehicleData.engine2Thrust * 100.0;
+					thrust = thrustPercent.ToString("000") + "% ";
+				    switch ( vehicleData.engine2State )
+					{
+						case AuxiliaryThrusterControl.State.STANDBY:  thrust = "stby"; break;
+						case AuxiliaryThrusterControl.State.ARMING:   thrust = "armg"; break;
+						case AuxiliaryThrusterControl.State.ARMED:    thrust = "ARMED"; break;
+						case AuxiliaryThrusterControl.State.DEPLETED: thrust = "---- "; break;
+						default:                                      break;
+					}	
+					setText(1, 11, thrust);
+					break;
+				}
+				case HudPage.FUEL:
+				{
+				    double fuelPercent = vehicleData.engine1FuelLevel * 100.0;
+					String fuel = fuelPercent.ToString("000");
+					setText(0, 9, fuel);
+				    fuelPercent = vehicleData.engine2FuelLevel * 100.0;
+					fuel = fuelPercent.ToString("000");
+					setText(1, 9, fuel);
+					break;
+				}
+			}
+			nextHudUpdateTime = Time.time + (hudUpdateInterval / 1000.0);
+		}			
+	}
+	
 	
 	/// <summary>
 	/// Sets the brightness of a LED.
@@ -574,10 +579,9 @@ public class ArduinoIO_Module : MonoBehaviour
 		DIAGNOSE = 0,
 		STANDBY, 
 		FIRST_SELECTABLE,
-		SPEED_KMH, 
-		SPEED_MACH, 
-		FUEL1,
-		FUEL2,
+		SPEED, 
+		THRUST, 
+		FUEL,
 		LAST_SELECTABLE,
 		ABORT
 	};
