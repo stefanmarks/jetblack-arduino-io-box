@@ -18,6 +18,7 @@
  * @version 1.6 - 2012.12.06: - Added LCD Backlight as colour LED
  *                            - Modified button command
  *                            - Added clear command
+ * @version 1.7 - 2012.12.11: - Adding a "text frame buffer" to handle the T command quickly and then slowly update the actua LCD
  *
  * Command set:
  * C               : Clear LCD
@@ -44,7 +45,7 @@
 
 // version of the IO box
 const char MODULE_NAME[]    = "JetBlack IO-Box";
-const char MODULE_VERSION[] = "v1.6";
+const char MODULE_VERSION[] = "v1.7";
 
 // macro for the size of an array
 #define ARRSIZE(x) (sizeof(x) / sizeof(x[0] ))
@@ -70,9 +71,6 @@ Button* arrButtons[] = {
   new DigitalButton(7)
 };
 
-// LCD and text initialization
-Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
-
 // constants for communication
 const char SUCCESS_CHAR = '+';
 const char ERROR_CHAR   = '!';
@@ -85,6 +83,21 @@ byte       rxBufferIdx = 0;
 byte       rxReadIdx   = 0;
 const byte rxBufferMax = sizeof(rxBuffer) / sizeof(rxBuffer[0]);
 
+// LCD and text initialization
+Adafruit_RGBLCDShield* pLCD = NULL; // if NO LCD is connnected, pLCD stays null
+
+int    iLcdRows    = 2;    // size of the LCD
+int    iLcdColumns = 16;
+char** arrTextIn   = NULL; // input text buffer
+int    iCursorRow  = 0;    // cursor for input
+int    iCursorCol  = 0;
+
+char** arrTextBuf  = NULL; // text buffer
+int    iTextBufRow = 0;    // current LCD update position
+int    iTextBufCol = 0;
+
+byte   bUpdateTextBufCounter = 0; // counter for updating LCD text buffer
+
 // the 8 arrays that form each segment of the large custom numbers
 byte bigNumberSegments[][8] = { { B00111, B01111, B11111, B11111, B11111, B11111, B11111, B11111 },
                                 { B11111, B11111, B11111, B00000, B00000, B00000, B00000, B00000 },
@@ -96,18 +109,18 @@ byte bigNumberSegments[][8] = { { B00111, B01111, B11111, B11111, B11111, B11111
                                 { B11111, B00000, B00000, B00000, B00000, B11111, B11111, B11111 } 
                               };
 // the 10 arrays for building a big number out of the special characters
-byte bigNumberChars[10][6] =  { { 0,  1,  2,   3,  4,  5 }, // 0
-                                { 1,  2, 32,   4,255,  4 }, // 1
-                                { 6,  6,  2,   3,  7,  7 }, // 2
-                                { 6,  6,  2,   7,  7,  5 }, // 3
-                                { 3,  4,  2,  32, 32,  5 }, // 4
-                                { 0,  6,  6,   7,  7,  5 }, // 5
-                                { 0,  6,  6,   3,  7,  5 }, // 6
-                                { 1,  1,  2,  32,  0, 32 }, // 7
-                                { 0,  6,  2,   3,  7,  5 }, // 8
-                                { 0,  6,  2,   4,  4,  5 }  // 9
-                              };
-
+byte bigNumberChars[][6] =  { { 0,  1,  2,   3,  4,  5 }, // 0
+                              { 1,  2, 32,   4,255,  4 }, // 1
+                              { 6,  6,  2,   3,  7,  7 }, // 2
+                              { 6,  6,  2,   7,  7,  5 }, // 3
+                              { 3,  4,  2,  32, 32,  5 }, // 4
+                              { 0,  6,  6,   7,  7,  5 }, // 5
+                              { 0,  6,  6,   3,  7,  5 }, // 6
+                              { 1,  1,  2,  32,  0, 32 }, // 7
+                              { 0,  6,  2,   3,  7,  5 }, // 8
+                              { 0,  6,  2,   4,  4,  5 }  // 9
+                            };
+                            
 
 /********************************************************************************
  * Setup and loop 
@@ -144,6 +157,32 @@ void loop()
   for ( int i = 0 ; i < ARRSIZE(arrButtons) ; i++ ) 
   {
     if ( arrButtons[i] != NULL ) arrButtons[i]->update(time);
+  }
+  
+  // slowly update LCD text from text buffer
+  if ( (arrTextIn != NULL) && (bUpdateTextBufCounter > 0) )
+  {
+    char c = arrTextIn[iTextBufRow][iTextBufCol];
+    if ( c != arrTextBuf[iTextBufRow][iTextBufCol] )
+    {
+      // a character has changed -> update LCD
+      pLCD->setCursor(iTextBufCol, iTextBufRow);
+      pLCD->print(c);
+      arrTextBuf[iTextBufRow][iTextBufCol] = c;
+    }
+    
+    // update "update" cursor
+    iTextBufCol++;
+    if ( iTextBufCol >= iLcdColumns )
+    {
+      iTextBufCol = 0;
+      iTextBufRow++;
+      if ( iTextBufRow >= iLcdRows )
+      {
+        iTextBufRow = 0;
+        bUpdateTextBufCounter--;
+      }
+    }    
   }
 }
 
@@ -516,7 +555,22 @@ void initializeLCD()
     pLCD = new Adafruit_RGBLCDShield();
     
     // set up the LCD's number of columns and rows: 
-    pLCD->begin(16, 2);
+    pLCD->begin(iLcdColumns, iLcdRows);
+    
+    // create text buffer
+    arrTextIn  = (char**) malloc(iLcdRows * sizeof(char*));
+    arrTextBuf = (char**) malloc(iLcdRows * sizeof(char*));
+    for ( int iRow = 0 ; iRow < iLcdRows ; iRow++ )
+    {
+      arrTextIn[iRow]  = (char*) malloc(iLcdColumns * sizeof(char));
+      arrTextBuf[iRow] = (char*) malloc(iLcdColumns * sizeof(char));
+      for ( int iCol = 0 ; iCol < iLcdColumns ; iCol++ )
+      {
+        arrTextIn[iRow][iCol]  = ' ';
+        arrTextBuf[iRow][iCol] = '\0'; // force update
+      }
+    }
+    bUpdateTextBufCounter = 2;
     
     // set the cursor to the top left position
     pLCD->setCursor(0,0);
@@ -558,14 +612,14 @@ void processSetCursorCommand()
     return;
   } 
   
-  //read any integers passed through
-  int row    = readInt(); 
-  int column = 0;
+  // read any integers passed through
+  iCursorRow = readInt(); 
+  iCursorCol = 0;
   if ( hasNextParameter() ) // column is optional
   {
-     column = readInt();
+     iCursorCol = readInt();
   }
-  pLCD->setCursor(column, row); 
+  
   Serial.println(SUCCESS_CHAR);
 }
 
@@ -605,8 +659,7 @@ void processSetBigNumberCommand()
   {
      //deemed unsuccessful if nothing was printed
      Serial.println(ERROR_CHAR);
-  }
-  
+  }  
 }
 
 
@@ -622,7 +675,17 @@ void processClearLcdCommand()
     return;
   }
   
-  pLCD->clear(); 
+  for ( int iRow = 0 ; iRow < iLcdRows ; iRow++ )
+  {
+    for ( int iCol = 0 ; iCol < iLcdColumns ; iCol++ )
+    {
+      arrTextIn[iRow][iCol]  = ' ';
+    }
+  }
+  iCursorRow = 0;
+  iCursorCol = 0;
+  bUpdateTextBufCounter = 2;
+    
   Serial.println(SUCCESS_CHAR); 
 }
 
@@ -641,11 +704,39 @@ void processSetLcdTextCommand()
   }
   
   String receivedString = readString();
-  Serial.println(SUCCESS_CHAR); // send success char very quickly (TODO: Buffer LCD text)
-  if ( receivedString.length() > 0 )
+  int len = receivedString.length();
+  if ( len > 0 )
   {
-    pLCD->print(receivedString); 
+    // if LCD was completely updated, or a text starts from the top left
+    // start updating actual LCD from the current cursor coordinates on
+    // to speed up the process
+    if ( (bUpdateTextBufCounter == 0) ||
+         ( (iCursorRow == 0) && (iCursorCol == 0) )
+       )
+    {
+      iTextBufRow = iCursorRow;
+      iTextBufCol = iCursorCol;
+    }
+    
+    for ( int iIdx = 0 ; iIdx < len ; iIdx++ )
+    {
+      arrTextIn[iCursorRow][iCursorCol] = receivedString[iIdx];
+      iCursorCol++; // move input cursor
+      if ( iCursorCol >= iLcdColumns )
+      {
+        iCursorCol = 0;
+        iCursorRow++;
+        if ( iCursorRow >= iLcdRows )
+        {
+          iCursorRow = 0;
+        }
+      }  
+    }
+    
+    bUpdateTextBufCounter = 2; // update LCD at least twice
   }
+  
+  Serial.println(SUCCESS_CHAR); // send success char very quickly
 }
 
 
