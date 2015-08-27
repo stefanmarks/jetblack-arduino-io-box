@@ -1,0 +1,1 @@
+In this project we will be integrating the Arduino eleven module into the current JetBlack simulator. We will be using the Arduino hardware to drive multiple devices/peripherals to better enhance the overall experience of the simulation environment.
